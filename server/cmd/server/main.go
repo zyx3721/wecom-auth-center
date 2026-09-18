@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -18,9 +20,28 @@ import (
 	"github.com/jerion/wecom-auth-center/server/internal/store"
 )
 
+// version、commit、buildDate 为构建信息，由 CI 通过 -ldflags -X 注入，源码直接编译时使用默认值
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
+)
+
+// versionText 组装 -v/--version 输出的版本信息文本
+func versionText() string {
+	return fmt.Sprintf("wecom-auth-center %s\ncommit: %s\nbuild: %s\ngo: %s\n", version, commit, buildDate, runtime.Version())
+}
+
 func main() {
+	showVersion := flag.Bool("v", false, "显示版本信息并退出")
+	flag.BoolVar(showVersion, "version", false, "显示版本信息并退出")
 	configPath := flag.String("config", "config.yaml", "配置文件路径")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Print(versionText())
+		os.Exit(0)
+	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)

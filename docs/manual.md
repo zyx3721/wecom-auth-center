@@ -408,7 +408,8 @@ curl -s -X POST https://auth.example.com/api/verify \
 
 1. 备份 `config.yaml`；
 2. Docker：`docker pull` 新镜像后重新 `docker run`；二进制：替换可执行文件后 `systemctl restart wecom-auth-center`；
-3. 观察 `/healthz` 与日志恢复正常。
+3. 执行 `./wecom-auth-center -v`（Docker 用 `docker exec <容器名> /app/wecom-auth-center -v`）确认版本已更新，该参数同样支持 `--version` 写法；
+4. 观察 `/healthz` 与日志恢复正常。
 
 # 九、安全建议
 

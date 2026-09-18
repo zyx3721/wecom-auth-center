@@ -147,6 +147,7 @@ docker run -d \
 ```bash
 docker ps --filter name=wecom-auth-center        # 查看运行状态
 docker logs -f wecom-auth-center                 # 查看实时日志
+docker exec wecom-auth-center /app/wecom-auth-center -v  # 查看当前版本
 docker restart wecom-auth-center                 # 重启容器
 docker stop wecom-auth-center                    # 停止
 docker stop wecom-auth-center && docker rm wecom-auth-center  # 停止并删除容器
@@ -204,6 +205,8 @@ cp config.example.yaml config.yaml
 vim config.yaml    # 填入 corpid/secret 与业务系统白名单，mock 置 false；权限 600
 ./wecom-auth-center -config config.yaml
 ```
+
+执行 `./wecom-auth-center -v`（或 `--version`）可查看当前版本信息。
 
 默认监听 `:8700`。需要常驻时交给 systemd：
 

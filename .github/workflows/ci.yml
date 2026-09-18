@@ -40,6 +40,9 @@ jobs:
       - name: 生成镜像标签
         id: tags
         run: |
+          echo "bin_version=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+          echo "bin_commit=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "bin_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
           ALIYUN_IMAGE="registry.cn-shenzhen.aliyuncs.com/zyx3721/wecom-auth-center"
           HUB_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/wecom-auth-center"
           VERSION=${GITHUB_REF#refs/tags/v}
@@ -63,6 +66,10 @@ jobs:
         working-directory: server
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
+          BUILD_VERSION=${GITHUB_REF_NAME}
+          BUILD_COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          LDFLAGS="-s -w -X main.version=${BUILD_VERSION} -X main.commit=${BUILD_COMMIT} -X main.buildDate=${BUILD_DATE}"
           mkdir -p dist
 
           prepare_package() {
@@ -74,42 +81,42 @@ jobs:
           }
 
           echo "🔨 编译 Linux AMD64..."
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o wecom-auth-center ./cmd/server
           prepare_package dist/linux_amd64
           mv wecom-auth-center dist/linux_amd64/
           tar -czf dist/wecom-auth-center_${VERSION}_linux_amd64.tar.gz -C dist linux_amd64
           rm -rf dist/linux_amd64
 
           echo "🔨 编译 Linux ARM64..."
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o wecom-auth-center ./cmd/server
           prepare_package dist/linux_arm64
           mv wecom-auth-center dist/linux_arm64/
           tar -czf dist/wecom-auth-center_${VERSION}_linux_arm64.tar.gz -C dist linux_arm64
           rm -rf dist/linux_arm64
 
           echo "🔨 编译 macOS AMD64..."
-          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o wecom-auth-center ./cmd/server
           prepare_package dist/darwin_amd64
           mv wecom-auth-center dist/darwin_amd64/
           tar -czf dist/wecom-auth-center_${VERSION}_darwin_amd64.tar.gz -C dist darwin_amd64
           rm -rf dist/darwin_amd64
 
           echo "🔨 编译 macOS ARM64..."
-          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o wecom-auth-center ./cmd/server
           prepare_package dist/darwin_arm64
           mv wecom-auth-center dist/darwin_arm64/
           tar -czf dist/wecom-auth-center_${VERSION}_darwin_arm64.tar.gz -C dist darwin_arm64
           rm -rf dist/darwin_arm64
 
           echo "🔨 编译 Windows AMD64..."
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center.exe ./cmd/server
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o wecom-auth-center.exe ./cmd/server
           prepare_package dist/windows_amd64
           mv wecom-auth-center.exe dist/windows_amd64/
           cd dist && zip -r wecom-auth-center_${VERSION}_windows_amd64.zip windows_amd64 && cd ..
           rm -rf dist/windows_amd64
 
           echo "🔨 编译 Windows ARM64..."
-          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center.exe ./cmd/server
+          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="${LDFLAGS}" -o wecom-auth-center.exe ./cmd/server
           prepare_package dist/windows_arm64
           mv wecom-auth-center.exe dist/windows_arm64/
           cd dist && zip -r wecom-auth-center_${VERSION}_windows_arm64.zip windows_arm64 && cd ..
@@ -134,6 +141,9 @@ jobs:
           provenance: false
           build-args: |
             GOPROXY=https://proxy.golang.org,direct
+            VERSION=${{ env.bin_version }}
+            COMMIT=${{ env.bin_commit }}
+            BUILD_DATE=${{ env.bin_date }}
 
       - name: 生成 Changelog
         id: changelog

@@ -143,6 +143,7 @@ Service management:
 ```bash
 docker ps --filter name=wecom-auth-center        # status
 docker logs -f wecom-auth-center                 # logs
+docker exec wecom-auth-center /app/wecom-auth-center -v  # current version
 docker restart wecom-auth-center                 # restart
 docker stop wecom-auth-center                    # stop
 docker stop wecom-auth-center && docker rm wecom-auth-center  # remove container
@@ -200,6 +201,8 @@ cp config.example.yaml config.yaml
 vim config.yaml    # fill in corpid/secret and the app whitelist, mock: false; chmod 600
 ./wecom-auth-center -config config.yaml
 ```
+
+Run `./wecom-auth-center -v` (or `--version`) to show the current version.
 
 The default listen address is `:8700`. For a persistent service, use systemd:
 

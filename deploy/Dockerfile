@@ -8,13 +8,18 @@ WORKDIR /src
 ARG GOPROXY=https://goproxy.cn,direct
 ENV GOPROXY=${GOPROXY}
 
+# 构建信息，由 CI 注入，本地直接构建时默认为开发版
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 # 先拷依赖清单利用层缓存，再拷源码
 COPY server/go.mod server/go.sum ./
 RUN go mod download
 
 COPY server/ ./
 
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}" -o wecom-auth-center ./cmd/server
 
 ############################
 # 2) runtime
