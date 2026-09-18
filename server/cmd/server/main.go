@@ -33,10 +33,30 @@ func versionText() string {
 	return fmt.Sprintf("wecom-auth-center %s\ncommit: %s\nbuild: %s\ngo: %s\n", version, commit, buildDate, runtime.Version())
 }
 
+// setUsage 自定义 -h/--help 输出：-v 与 -version 合并一行，各参数描述统一换行缩进对齐
+func setUsage() {
+	flag.Usage = func() {
+		w := flag.CommandLine.Output()
+		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
+		flag.VisitAll(func(f *flag.Flag) {
+			if f.Name == "version" {
+				return
+			}
+			if f.Name == "v" {
+				fmt.Fprintf(w, "  -v, -version\n    \t%s\n", f.Usage)
+				return
+			}
+			name, usage := flag.UnquoteUsage(f)
+			fmt.Fprintf(w, "  -%s %s\n    \t%s (default %q)\n", f.Name, name, usage, f.DefValue)
+		})
+	}
+}
+
 func main() {
 	showVersion := flag.Bool("v", false, "显示版本信息并退出")
 	flag.BoolVar(showVersion, "version", false, "显示版本信息并退出")
 	configPath := flag.String("config", "config.yaml", "配置文件路径")
+	setUsage()
 	flag.Parse()
 
 	if *showVersion {
