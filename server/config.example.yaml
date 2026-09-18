@@ -1,0 +1,41 @@
+# 复制为 config.yaml 后按实际环境修改；config.yaml 已被 .gitignore 排除。
+# app_secret 生成方式：openssl rand -hex 32
+
+server:
+  listen: ":8700"
+  # 对外访问地址（反代后的 HTTPS 域名），不能以 / 结尾
+  external_url: "https://auth.example.com"
+  static_dir: "web/static"
+  # 部署在 Nginx 等反代后设为 true，限流将从 X-Real-IP 取真实客户端 IP
+  trust_proxy: false
+
+wecom:
+  corpid: "wwYourCorpID"
+  agentid: 1000002
+  secret: "YourSelfBuiltAppSecret"
+  # qrcode = PC 浏览器扫码（wwlogin）；inside = 企业微信内置浏览器网页授权
+  mode: "qrcode"
+  # 本地演练开关：true 时不访问企业微信真实接口，/login 直接进入模拟扫码页
+  mock: false
+  # true 时调用通讯录接口补全姓名（要求应用有通讯录读取权限）
+  fetch_name: false
+
+ttl:
+  state: 300s
+  ticket: 60s
+  verify_ts_skew: 60s
+
+# 业务系统白名单：app 标识 -> 回调域名。请求参数中永远不接受完整 URL。
+apps:
+  oa:
+    domain: "https://oa.example.com"
+    callback_path: "/sso/login"
+    app_secret: "REPLACE_WITH_openssl_rand_hex_32_aaaaaaaaaaaaaaaa"
+  itdb:
+    domain: "https://it.example.com"
+    callback_path: "/sso/login"
+    app_secret: "REPLACE_WITH_openssl_rand_hex_32_bbbbbbbbbbbbbbbb"
+
+ratelimit:
+  login_per_minute: 30
+  verify_per_minute: 120
