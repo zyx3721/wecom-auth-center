@@ -320,7 +320,7 @@ server {
 
 | 字段 | 说明 |
 | --- | --- |
-| `domain` | 业务系统对外域名，必须 `https://` 开头，不带尾斜杠 |
+| `domain` | 业务系统对外域名，`https://` 或 `http://` 开头（生产推荐 HTTPS；HTTP 仅建议内网，ticket 将明文传输，启动时有 Warn 提示），不带尾斜杠 |
 | `callback_path` | 登录成功后的回调路径，约定统一为 `/sso/login` |
 | `app_secret` | verify 签名密钥，≥32 位（`openssl rand -hex 32` 生成）；更换后重启即生效，旧值立即失效 |
 

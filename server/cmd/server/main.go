@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -72,6 +73,7 @@ func main() {
 		logger.Error("加载配置失败", "error", err)
 		os.Exit(1)
 	}
+	warnHTTPApps(cfg, logger)
 
 	var wcom service.WeCom
 	if cfg.Wecom.Mock {
@@ -111,6 +113,15 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("优雅关闭失败", "error", err)
+	}
+}
+
+// warnHTTPApps 对使用 HTTP 的业务系统域名提示票据明文传输风险
+func warnHTTPApps(cfg *config.Config, logger *slog.Logger) {
+	for name, app := range cfg.Apps {
+		if strings.HasPrefix(app.Domain, "http://") {
+			logger.Warn("业务系统域名使用 HTTP，ticket 将明文传输，请确认内网可信", "app", name, "domain", app.Domain)
+		}
 	}
 }
 

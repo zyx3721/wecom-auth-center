@@ -145,8 +145,8 @@ func (c *Config) validate() error {
 		switch {
 		case app == nil:
 			return fmt.Errorf("apps.%s 配置为空", name)
-		case !strings.HasPrefix(app.Domain, "https://"):
-			return fmt.Errorf("apps.%s.domain 必须为 https:// 开头", name)
+		case !strings.HasPrefix(app.Domain, "https://") && !strings.HasPrefix(app.Domain, "http://"):
+			return fmt.Errorf("apps.%s.domain 必须以 http(s):// 开头", name)
 		case !strings.HasPrefix(app.CallbackPath, "/"):
 			return fmt.Errorf("apps.%s.callback_path 必须以 / 开头", name)
 		case len(app.AppSecret) < 32:

@@ -64,6 +64,7 @@ apps:`, 1),
 		"redis 缺地址": strings.Replace(validYAML, "apps:", `store:
   driver: redis
 apps:`, 1),
+		"domain 协议非法": strings.Replace(validYAML, `https://oa.example.com`, "ftp://oa.example.com", 1),
 	}
 	for name, y := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -102,6 +103,17 @@ func TestLoadMockAllowsEmptyCorpID(t *testing.T) {
 	y = strings.Replace(y, `corpid: "wwX"`, `corpid: ""`, 1)
 	if _, err := Load(writeTemp(t, y)); err != nil {
 		t.Fatalf("mock 模式应允许空 corpid: %v", err)
+	}
+}
+
+func TestLoadHTTPDomainAllowed(t *testing.T) {
+	y := strings.Replace(validYAML, `https://oa.example.com`, "http://oa.example.com", 1)
+	cfg, err := Load(writeTemp(t, y))
+	if err != nil {
+		t.Fatalf("内网 HTTP 域名应允许配置: %v", err)
+	}
+	if cfg.Apps["oa"].Domain != "http://oa.example.com" {
+		t.Fatalf("HTTP 域名解析不符: %s", cfg.Apps["oa"].Domain)
 	}
 }
 

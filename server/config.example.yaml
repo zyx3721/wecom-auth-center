@@ -40,6 +40,7 @@ audit:
   path: "audit.log"
 
 # 业务系统白名单：app 标识 -> 回调域名。请求参数中永远不接受完整 URL。
+# domain 支持 https（推荐）与 http（仅建议内网使用，ticket 将明文传输，启动时有 Warn 提示）
 apps:
   oa:
     domain: "https://oa.example.com"
