@@ -345,6 +345,8 @@ wecom-auth-center/
 │   ├── wecom-setup.md          企业微信后台/域名/证书配置清单
 │   ├── client-integration.md   业务系统接入指南
 │   └── manual.md               完整手册（配置参考、接口调试、反代与排障）
+├── scripts/
+│   └── run.sh                  服务器启停管理脚本（start/stop/restart）
 ├── README.md                   中文说明（本文件）
 └── README.en.md                English
 ```
@@ -366,6 +368,7 @@ wecom-auth-center/
 
 | 版本 | 发布日期 | 更新日志 |
 | --- | --- | --- |
+| v1.0.1 | 2026-09-19 | [verchanglog/v1.0.1.md](verchanglog/v1.0.1.md) |
 | v1.0.0 | 2026-09-18 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
 
 各版本的构建产物与发布说明见 [GitHub Releases](https://github.com/zyx3721/wecom-auth-center/releases)。

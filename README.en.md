@@ -334,6 +334,8 @@ wecom-auth-center/
 ├── .github/
 │   └── workflows/ci.yml        test gate + multi-arch tag release + image push
 ├── docs/                       architecture, WeCom setup, integration guide & manual (Chinese)
+├── scripts/
+│   └── run.sh                  server start/stop/restart helper script
 ├── README.md                   简体中文
 └── README.en.md                English (this file)
 ```
@@ -355,6 +357,7 @@ wecom-auth-center/
 
 | Version | Date | Changelog |
 | --- | --- | --- |
+| v1.0.1 | 2026-09-19 | [verchanglog/v1.0.1.md](verchanglog/v1.0.1.md) |
 | v1.0.0 | 2026-09-18 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
 
 Build artifacts and release notes for each version are available on [GitHub Releases](https://github.com/zyx3721/wecom-auth-center/releases).

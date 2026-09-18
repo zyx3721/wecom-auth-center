@@ -67,6 +67,7 @@ wecom-auth-center/
 │   ├── web/static/             企微域名校验文件等静态资源
 │   └── config.example.yaml     配置模板
 ├── deploy/                     Dockerfile、nginx 示例、systemd 单元
+├── scripts/                    服务器启停管理脚本（start/stop/restart）
 ├── .github/workflows/ci.yml    测试门禁 + tag 发布 + 阿里云镜像推送
 └── docs/                       架构、企微配置、接入指南与本手册
 ```
