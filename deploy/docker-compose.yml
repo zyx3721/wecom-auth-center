@@ -1,0 +1,17 @@
+# wecom-auth-center Docker Compose 部署示例
+# 使用前先在宿主机准备 config.yaml（复制 server/config.example.yaml 修改），路径按实际环境调整
+# 启动：docker compose up -d    升级：docker compose pull && docker compose up -d
+
+services:
+  wecom-auth-center:
+    # 海外或阿里云拉取不便时可换 Docker Hub 镜像：zyx3721/wecom-auth-center:latest
+    image: registry.cn-shenzhen.aliyuncs.com/zyx3721/wecom-auth-center:latest
+    container_name: wecom-auth-center
+    restart: unless-stopped
+    # 只绑回环，由宿主机 Nginx 反代对外；临时直连调试可改为 "8700:8700"
+    ports:
+      - "127.0.0.1:8700:8700"
+    volumes:
+      - /opt/wecom-auth-center/config.yaml:/app/config.yaml:ro
+      # 启用审计日志时挂载可写目录，并将 config.yaml 中 audit.path 指向 /app/audit/audit.log
+      # - /opt/wecom-auth-center/audit:/app/audit

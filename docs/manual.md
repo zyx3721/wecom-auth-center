@@ -67,7 +67,7 @@ wecom-auth-center/
 │   ├── internal/middleware/    日志、恢复、限流
 │   ├── web/static/             企微域名校验文件等静态资源
 │   └── config.example.yaml     配置模板
-├── deploy/                     Dockerfile、nginx 示例、systemd 单元
+├── deploy/                     Dockerfile、compose 示例、nginx 示例、systemd 单元
 ├── scripts/                    服务器启停管理脚本（start/stop/restart）
 ├── .github/workflows/ci.yml    测试门禁 + tag 发布 + 阿里云镜像推送
 └── docs/                       架构、企微配置、接入指南与本手册
@@ -164,6 +164,8 @@ docker run -d \
 ```
 
 `-p 127.0.0.1:8700:8700` 只绑回环，由宿主机 Nginx 反代对外；如需临时直连调试可改 `-p 8700:8700`。
+
+也可使用 Compose 部署：复制 `deploy/docker-compose.yml` 并按需调整挂载路径，`docker compose up -d` 启动，`docker compose pull && docker compose up -d` 升级；审计目录挂载示例见该文件注释。
 
 ## 3.4 服务管理与升级
 

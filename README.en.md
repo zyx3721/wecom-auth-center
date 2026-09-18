@@ -332,6 +332,7 @@ wecom-auth-center/
 │   └── go.mod
 ├── deploy/
 │   ├── Dockerfile              multi-stage build (CI pushes to the Aliyun registry)
+│   ├── docker-compose.yml      Compose deployment sample (config/audit mounts)
 │   ├── nginx.conf.example      reverse proxy + HTTPS + HSTS for the auth domain
 │   └── systemd/wecom-auth-center.service
 ├── .github/
@@ -360,6 +361,7 @@ wecom-auth-center/
 
 | Version | Date | Changelog |
 | --- | --- | --- |
+| v1.1.0 | 2026-09-19 | [verchanglog/v1.1.0.md](verchanglog/v1.1.0.md) |
 | v1.0.1 | 2026-09-19 | [verchanglog/v1.0.1.md](verchanglog/v1.0.1.md) |
 | v1.0.0 | 2026-09-18 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
 

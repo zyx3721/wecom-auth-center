@@ -338,6 +338,7 @@ wecom-auth-center/
 │   └── go.mod
 ├── deploy/
 │   ├── Dockerfile              多阶段构建（CI 推送阿里云镜像仓库）
+│   ├── docker-compose.yml      Compose 部署示例（配置/审计目录挂载）
 │   ├── nginx.conf.example      auth 域名反代 + HTTPS + HSTS
 │   └── systemd/wecom-auth-center.service
 ├── .github/
@@ -371,6 +372,7 @@ wecom-auth-center/
 
 | 版本 | 发布日期 | 更新日志 |
 | --- | --- | --- |
+| v1.1.0 | 2026-09-19 | [verchanglog/v1.1.0.md](verchanglog/v1.1.0.md) |
 | v1.0.1 | 2026-09-19 | [verchanglog/v1.0.1.md](verchanglog/v1.0.1.md) |
 | v1.0.0 | 2026-09-18 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
 

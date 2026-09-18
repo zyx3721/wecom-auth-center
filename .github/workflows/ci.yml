@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "bin_version=${GITHUB_REF_NAME}" >> $GITHUB_ENV
           echo "bin_commit=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "bin_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          echo "bin_date=$(TZ=Asia/Shanghai date +"%Y-%m-%dT%H:%M:%S%:z")" >> $GITHUB_ENV
           ALIYUN_IMAGE="registry.cn-shenzhen.aliyuncs.com/zyx3721/wecom-auth-center"
           HUB_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/wecom-auth-center"
           VERSION=${GITHUB_REF#refs/tags/v}
@@ -68,7 +68,7 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           BUILD_VERSION=${GITHUB_REF_NAME}
           BUILD_COMMIT=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BUILD_DATE=$(TZ=Asia/Shanghai date +"%Y-%m-%dT%H:%M:%S%:z")
           LDFLAGS="-s -w -X main.version=${BUILD_VERSION} -X main.commit=${BUILD_COMMIT} -X main.buildDate=${BUILD_DATE}"
           mkdir -p dist
 
@@ -169,7 +169,7 @@ jobs:
           ### 📋 构建信息
           - **版本**: v${VERSION}
           - **Commit**: ${GITHUB_SHA:0:7}
-          - **构建时间**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          - **构建时间**: $(TZ=Asia/Shanghai date +"%Y-%m-%dT%H:%M:%S%:z")
 
           ### 📝 更新内容
           ${COMMITS}
