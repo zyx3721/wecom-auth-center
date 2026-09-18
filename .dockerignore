@@ -19,6 +19,8 @@ server/config.yaml
 docs/
 deploy/
 README*.md
+AGENTS.md
+优化.md
 *.example
 
 # 系统与编辑器
