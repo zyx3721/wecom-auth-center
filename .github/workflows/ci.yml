@@ -1,0 +1,234 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    # 质量门禁：push 与 PR 都跑；tag push 由 release job 负责，不重复跑
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+          cache-dependency-path: server/go.sum
+
+      - name: gofmt 格式检查
+        working-directory: server
+        run: |
+          UNFORMATTED=$(gofmt -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "::error::以下文件未通过 gofmt："
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
+      - name: go vet 静态检查
+        working-directory: server
+        run: go vet ./...
+
+      - name: 单元测试
+        working-directory: server
+        run: go test -race ./...
+
+      - name: 构建验证
+        working-directory: server
+        run: go build ./...
+
+  release:
+    # 打 v* tag 时交叉编译多平台二进制并创建 GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 登录阿里云镜像仓库
+        uses: docker/login-action@v4
+        with:
+          registry: registry.cn-shenzhen.aliyuncs.com
+          username: ${{ secrets.ALIYUN_REGISTRY_USERNAME }}
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: 生成镜像标签
+        id: tags
+        run: |
+          ALIYUN_IMAGE="registry.cn-shenzhen.aliyuncs.com/zyx3721/wecom-auth-center"
+          HUB_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/wecom-auth-center"
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if [[ "$VERSION" =~ (alpha|beta|rc|pre) ]]; then
+            echo "tags=${ALIYUN_IMAGE}:${VERSION},${HUB_IMAGE}:${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "📦 检测到预发布版本: v${VERSION} (不打 latest 标签)"
+          else
+            echo "tags=${ALIYUN_IMAGE}:${VERSION},${ALIYUN_IMAGE}:latest,${HUB_IMAGE}:${VERSION},${HUB_IMAGE}:latest" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "🚀 正式版本: v${VERSION} (打 latest 标签)"
+          fi
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+          cache-dependency-path: server/go.sum
+
+      - name: 交叉编译多平台二进制文件
+        working-directory: server
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          mkdir -p dist
+
+          prepare_package() {
+            local pkg_dir=$1
+            mkdir -p ${pkg_dir}
+            cp config.example.yaml ${pkg_dir}/
+            cp ../docs/wecom-setup.md ../docs/client-integration.md ${pkg_dir}/
+            echo "请将 config.example.yaml 复制为 config.yaml 并配置 corpid/secret 与业务系统白名单" > ${pkg_dir}/README.txt
+          }
+
+          echo "🔨 编译 Linux AMD64..."
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          prepare_package dist/linux_amd64
+          mv wecom-auth-center dist/linux_amd64/
+          tar -czf dist/wecom-auth-center_${VERSION}_linux_amd64.tar.gz -C dist linux_amd64
+          rm -rf dist/linux_amd64
+
+          echo "🔨 编译 Linux ARM64..."
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          prepare_package dist/linux_arm64
+          mv wecom-auth-center dist/linux_arm64/
+          tar -czf dist/wecom-auth-center_${VERSION}_linux_arm64.tar.gz -C dist linux_arm64
+          rm -rf dist/linux_arm64
+
+          echo "🔨 编译 macOS AMD64..."
+          GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          prepare_package dist/darwin_amd64
+          mv wecom-auth-center dist/darwin_amd64/
+          tar -czf dist/wecom-auth-center_${VERSION}_darwin_amd64.tar.gz -C dist darwin_amd64
+          rm -rf dist/darwin_amd64
+
+          echo "🔨 编译 macOS ARM64..."
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center ./cmd/server
+          prepare_package dist/darwin_arm64
+          mv wecom-auth-center dist/darwin_arm64/
+          tar -czf dist/wecom-auth-center_${VERSION}_darwin_arm64.tar.gz -C dist darwin_arm64
+          rm -rf dist/darwin_arm64
+
+          echo "🔨 编译 Windows AMD64..."
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center.exe ./cmd/server
+          prepare_package dist/windows_amd64
+          mv wecom-auth-center.exe dist/windows_amd64/
+          cd dist && zip -r wecom-auth-center_${VERSION}_windows_amd64.zip windows_amd64 && cd ..
+          rm -rf dist/windows_amd64
+
+          echo "🔨 编译 Windows ARM64..."
+          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o wecom-auth-center.exe ./cmd/server
+          prepare_package dist/windows_arm64
+          mv wecom-auth-center.exe dist/windows_arm64/
+          cd dist && zip -r wecom-auth-center_${VERSION}_windows_arm64.zip windows_arm64 && cd ..
+          rm -rf dist/windows_arm64
+
+          echo "✅ 编译完成"
+
+      - name: 生成发布产物校验和
+        run: |
+          sha256sum server/dist/*.tar.gz server/dist/*.zip \
+            | sed -E 's#server/dist/##' > SHA256SUMS
+
+      - name: 构建并推送 Docker 镜像
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./deploy/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            GOPROXY=https://proxy.golang.org,direct
+
+      - name: 生成 Changelog
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
+          fi
+
+          if [[ "$VERSION" =~ (alpha|beta|rc|pre) ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+
+          cat > release_notes.md << EOF
+          ## 🎉 wecom-auth-center v${VERSION} 发布
+
+          ### 📋 构建信息
+          - **版本**: v${VERSION}
+          - **Commit**: ${GITHUB_SHA:0:7}
+          - **构建时间**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          ### 📝 更新内容
+          ${COMMITS}
+
+          ### 🐳 Docker 镜像
+          \`\`\`bash
+          # 阿里云镜像仓库（国内推荐）
+          docker pull registry.cn-shenzhen.aliyuncs.com/zyx3721/wecom-auth-center:${VERSION}
+          # Docker Hub
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/wecom-auth-center:${VERSION}
+          \`\`\`
+
+          ### 📦 二进制下载
+          - Linux AMD64: \`wecom-auth-center_${VERSION}_linux_amd64.tar.gz\`
+          - Linux ARM64: \`wecom-auth-center_${VERSION}_linux_arm64.tar.gz\`
+          - macOS AMD64: \`wecom-auth-center_${VERSION}_darwin_amd64.tar.gz\`
+          - macOS ARM64: \`wecom-auth-center_${VERSION}_darwin_arm64.tar.gz\`
+          - Windows AMD64: \`wecom-auth-center_${VERSION}_windows_amd64.zip\`
+          - Windows ARM64: \`wecom-auth-center_${VERSION}_windows_arm64.zip\`
+
+          ### 🔐 校验和
+          下载 \`SHA256SUMS\` 和对应产物后，执行 \`sha256sum -c SHA256SUMS\` 验证文件完整性。
+          EOF
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ steps.changelog.outputs.is_prerelease == 'true' }}
+          generate_release_notes: false
+          files: |
+            server/dist/*.tar.gz
+            server/dist/*.zip
+            SHA256SUMS
