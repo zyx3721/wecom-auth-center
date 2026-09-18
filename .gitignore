@@ -8,7 +8,39 @@ server/bin/
 *.test
 coverage.out
 
-# 运行与编辑器
+# 日志
+logs/
 *.log
-.idea/
+
+# IDE / 编辑器
 .vscode/
+!.vscode/extensions.json
+.idea/
+.fleet/
+*.sw?
+
+# AI 编辑器配置
+.claude/
+.trae/
+.codebuddy/
+.cursor/
+.copilot/
+.aider*
+.codeium/
+.tabnine/
+.codex/
+.supermaven/
+.windsurf/
+.zed/
+continue/
+.github/copilot/
+.codex-cache/
+.codegraph/
+.playwright-mcp/
+.playwright-cli/
+AGENTS.md
+CLAUDE.md
+
+# 文档文件
+优化.md
+requirements.txt
