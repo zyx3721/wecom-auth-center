@@ -1,0 +1,28 @@
+# git 与 CI
+.git/
+.github/
+
+# 构建产物
+server/bin/
+*.exe
+*.test
+*.out
+coverage.out
+
+# 敏感配置（严禁进入镜像层）
+server/config.yaml
+*.local.yaml
+.env
+.env.*
+
+# 文档与部署编排（镜像不需要）
+docs/
+deploy/
+README*.md
+*.example
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

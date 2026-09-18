@@ -1,0 +1,14 @@
+# 敏感配置（corpid/secret/app_secret）
+server/config.yaml
+*.local.yaml
+
+# Go
+server/bin/
+*.exe
+*.test
+coverage.out
+
+# 运行与编辑器
+*.log
+.idea/
+.vscode/

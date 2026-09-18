@@ -1,0 +1,43 @@
+# auth.example.com 反向代理示例（Nginx）
+# 用途：TLS 终止 + 转发到本机服务，并向后端传递真实客户端 IP（配合 server.trust_proxy: true）
+# 放置：/etc/nginx/conf.d/wecom-auth-center.conf（Linux）或对应 include 目录
+
+# HTTP 全部跳转 HTTPS
+server {
+    listen 80;
+    server_name auth.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    # listen 443 ssl http2;  # Nginx 1.25 以下版本写法
+    listen 443 ssl;
+    http2 on;
+    server_name auth.example.com;
+
+    ssl_certificate     /usr/local/nginx/ssl/auth.example.com.fullchain.pem;
+    ssl_certificate_key /usr/local/nginx/ssl/auth.example.com.key;
+    
+    ssl_protocols              TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers  on;
+    ssl_ciphers                ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_session_timeout        10m;
+    ssl_session_cache          shared:SSL:10m;
+    ssl_session_tickets        off;
+    
+    access_log /usr/local/nginx/logs/auth-access.log;
+    error_log /usr/local/nginx/logs/auth-error.log warn;
+
+    # HSTS
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # 企业微信域名归属校验文件与静态资源也经此入口
+    location / {
+        proxy_pass         http://127.0.0.1:8700;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+    }
+}

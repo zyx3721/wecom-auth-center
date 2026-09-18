@@ -1,0 +1,28 @@
+# wecom-auth-center systemd 服务单元
+# 放置：/etc/systemd/system/wecom-auth-center.service
+# 部署目录约定：/opt/wecom-auth-center/{bin/server, config.yaml, web/static/}
+# config.yaml 权限应为 600，属主为运行用户（内含 secret）
+
+[Unit]
+Description=wecom-auth-center (企业微信统一认证中心)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wecom-auth
+Group=wecom-auth
+WorkingDirectory=/opt/wecom-auth-center
+ExecStart=/opt/wecom-auth-center/bin/server -config /opt/wecom-auth-center/config.yaml
+Restart=on-failure
+RestartSec=3
+
+# 基础加固
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/wecom-auth-center
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
