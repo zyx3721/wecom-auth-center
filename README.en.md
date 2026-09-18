@@ -361,6 +361,7 @@ wecom-auth-center/
 
 | Version | Date | Changelog |
 | --- | --- | --- |
+| v1.1.1 | 2026-09-19 | [verchanglog/v1.1.1.md](verchanglog/v1.1.1.md) |
 | v1.1.0 | 2026-09-19 | [verchanglog/v1.1.0.md](verchanglog/v1.1.0.md) |
 | v1.0.1 | 2026-09-19 | [verchanglog/v1.0.1.md](verchanglog/v1.0.1.md) |
 | v1.0.0 | 2026-09-18 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
