@@ -5,6 +5,7 @@ SERVER_NAME="wecom-auth-center"
 PID_FILE="$BASE_DIR/app.pid"
 LOG_FILE="$BASE_DIR/app.log"
 APP="$BASE_DIR/wecom-auth-center"
+CONFIG_FILE="$BASE_DIR/config.yaml"
 
 PID=$(cat $PID_FILE 2>/dev/null)
 
@@ -28,7 +29,7 @@ case $1 in
 
     # 记录启动时间
     log_message "========== 启动 $SERVER_NAME =========="
-    nohup "$APP" >> "$LOG_FILE" 2>&1 &
+    nohup "$APP" -config "$CONFIG_FILE" >> "$LOG_FILE" 2>&1 &
 
     NEW_PID=$!
     echo "$NEW_PID" > "$PID_FILE"
@@ -96,7 +97,7 @@ case $1 in
     
     echo -n > "$PID_FILE"
     cd "$BASE_DIR" || exit 1
-    nohup "$APP" >> "$LOG_FILE" 2>&1 &
+    nohup "$APP" -config "$CONFIG_FILE" >> "$LOG_FILE" 2>&1 &
 
     NEW_PID=$!
     echo "$NEW_PID" > "$PID_FILE"
