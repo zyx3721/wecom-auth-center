@@ -25,6 +25,20 @@ ttl:
   ticket: 60s
   verify_ts_skew: 60s
 
+# 短时效存储：memory（默认，单实例进程内存）；redis（多实例部署时切换，要求 Redis 6.2+ 支持 GETDEL）
+store:
+  driver: "memory"
+  redis:
+    addr: "127.0.0.1:6379"
+    password: ""
+    db: 0
+
+# 安全审计日志：开启后登录发起、ticket 签发/兑换及 state 失败、重放、错签等事件独立落盘为 JSON 行
+# 注意：Docker 部署启用时须为审计文件挂载可写目录（镜像内以非 root 运行）
+audit:
+  enabled: false
+  path: "audit.log"
+
 # 业务系统白名单：app 标识 -> 回调域名。请求参数中永远不接受完整 URL。
 apps:
   oa:

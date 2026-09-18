@@ -43,6 +43,12 @@ func TestLoadValid(t *testing.T) {
 	if cfg.RateLimit.LoginPerMinute != 30 {
 		t.Fatalf("限流默认值应为 30，实际 %d", cfg.RateLimit.LoginPerMinute)
 	}
+	if cfg.Store.Driver != "memory" {
+		t.Fatalf("存储驱动默认值应为 memory，实际 %s", cfg.Store.Driver)
+	}
+	if cfg.Audit.Path != "audit.log" {
+		t.Fatalf("审计文件默认路径应为 audit.log，实际 %s", cfg.Audit.Path)
+	}
 }
 
 func TestLoadRejects(t *testing.T) {
@@ -52,6 +58,12 @@ func TestLoadRejects(t *testing.T) {
 		"app_secret 太短": strings.Replace(validYAML,
 			"0123456789abcdef0123456789abcdef", "short", 1),
 		"无业务系统": strings.Replace(validYAML, "apps:", "apps_empty:", 1),
+		"存储驱动非法": strings.Replace(validYAML, "apps:", `store:
+  driver: etcd
+apps:`, 1),
+		"redis 缺地址": strings.Replace(validYAML, "apps:", `store:
+  driver: redis
+apps:`, 1),
 	}
 	for name, y := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -59,6 +71,28 @@ func TestLoadRejects(t *testing.T) {
 				t.Fatalf("%s 应被拒绝", name)
 			}
 		})
+	}
+}
+
+func TestLoadRedisDriverValid(t *testing.T) {
+	y := strings.Replace(validYAML, "apps:", `store:
+  driver: redis
+  redis:
+    addr: "127.0.0.1:6379"
+    db: 1
+audit:
+  enabled: true
+  path: "/var/log/wecom-audit.log"
+apps:`, 1)
+	cfg, err := Load(writeTemp(t, y))
+	if err != nil {
+		t.Fatalf("redis 存储与审计配置应加载成功: %v", err)
+	}
+	if cfg.Store.Driver != "redis" || cfg.Store.Redis.Addr != "127.0.0.1:6379" || cfg.Store.Redis.DB != 1 {
+		t.Fatalf("store 配置解析不符: %+v", cfg.Store)
+	}
+	if !cfg.Audit.Enabled || cfg.Audit.Path != "/var/log/wecom-audit.log" {
+		t.Fatalf("audit 配置解析不符: %+v", cfg.Audit)
 	}
 }
 

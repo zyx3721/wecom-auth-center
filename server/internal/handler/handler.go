@@ -7,24 +7,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jerion/wecom-auth-center/server/internal/audit"
 	"github.com/jerion/wecom-auth-center/server/internal/config"
 	"github.com/jerion/wecom-auth-center/server/internal/service"
 )
 
 // Handler 聚合路由处理所需的依赖。
 type Handler struct {
-	cfg  *config.Config
-	sso  *service.SSO
-	wcom service.WeCom
-	now  func() time.Time
-	log  *slog.Logger
+	cfg   *config.Config
+	sso   *service.SSO
+	wcom  service.WeCom
+	now   func() time.Time
+	log   *slog.Logger
+	audit *audit.Logger
 }
 
-func New(cfg *config.Config, sso *service.SSO, wcom service.WeCom, log *slog.Logger) *Handler {
+func New(cfg *config.Config, sso *service.SSO, wcom service.WeCom, log *slog.Logger, auditLog *audit.Logger) *Handler {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Handler{cfg: cfg, sso: sso, wcom: wcom, now: time.Now, log: log}
+	return &Handler{cfg: cfg, sso: sso, wcom: wcom, now: time.Now, log: log, audit: auditLog}
 }
 
 // appOf 查白名单，返回业务系统配置。

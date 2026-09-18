@@ -84,7 +84,7 @@ Go 编写，无外部数据库，`go build` 出单文件即可部署；内置 mo
 - **`ticket` 交接** — 认证中心用 code 从企微换出 `userid` 后签发 60 秒一次性 ticket，302 带回业务系统。
 - **`verify` 收口** — 业务系统后端持 `app_secret` 签名调用 `/api/verify` 换取身份，凭证用后即焚；浏览器不接触 verify。
 - **会话归属** — 认证中心不派发全局会话；每个业务系统验证 ticket 后建立自己的 Session/JWT，登出互不影响。
-- **数据放哪** — state/ticket 均为秒级短时效数据，默认存进程内存；多实例部署时切换 Redis（接口已预留）。
+- **数据放哪** — state/ticket 均为秒级短时效数据，默认存进程内存；多实例部署配置 `store.driver: redis` 切换共享存储，安全事件可开启独立审计文件留痕。
 
 ## 技术栈
 
@@ -93,7 +93,7 @@ Go 编写，无外部数据库，`go build` 出单文件即可部署；内置 mo
 | 语言 | Go 1.26+（仅标准库 `net/http`，Go 1.22+ 方法路由） |
 | 外部依赖 | [gopkg.in/yaml.v3](https://github.com/go-yaml/yaml)（唯一第三方依赖） |
 | 授权入口 | 企业微信 wwlogin 扫码（PC）/ 网页授权 `snsapi_base`（企微内 H5），配置切换 |
-| 存储 | 进程内存 + TTL（默认）；`Store` 接口预留 Redis 实现 |
+| 存储 | 进程内存（默认）或 Redis（`SET EX`+`GETDEL`），配置切换，多实例部署选 Redis |
 | 部署形态 | 单二进制 + systemd，或多阶段 Docker 镜像 |
 
 ## 快速开始
@@ -141,6 +141,8 @@ docker run -d \
 > Windows PowerShell 下把 `-v` 的源路径改写为 `${PWD}/config.yaml` 形式。
 
 启动前先在宿主机准备 `config.yaml`（从 `server/config.example.yaml` 复制修改，`wecom.mock` 置为 `false`，填入 corpid/secret 与业务系统白名单；文件内含 `secret`，权限建议 600）。每个字段说明见 [docs/manual.md](docs/manual.md) 第五章。
+
+> 可选增强：多实例部署时将 `store.driver` 改为 `redis`，进行中的登录流程跨实例共享；需要安全审计时开启 `audit.enabled`，Docker 下审计文件必须落在挂载的可写目录（如追加 `-v /opt/wecom-auth-center/audit:/app/audit` 并设 `audit.path`），否则服务会因审计文件无法打开而拒绝启动。详见 [docs/manual.md](docs/manual.md) 第五章与 8.1 节。
 
 服务管理：
 
@@ -279,8 +281,8 @@ verify 双因子：HMAC-SHA256 签名 + 时间戳偏差 ≤ 60s
 - **全站 HTTPS** — 企微可信域名硬性要求；反代开启 HSTS（nginx 示例已含）。
 - **密钥最小分发** — 业务系统只持有自己的 `app_secret`，且仅用于 verify 签名，不等于企微凭据。
 - **限流** — `/login` 默认 30 次/分钟/IP，`/api/verify` 120 次/分钟/IP，可在配置调整。
-- **审计日志** — state 校验失败、ticket 重放、签名失败均有结构化日志可查。
-- **重启影响** — 内存存储下重启会丢弃进行中的登录流程，用户重扫即可；正式多实例部署时切 Redis。
+- **审计日志** — 可选开启独立 JSON 行审计文件：登录发起、ticket 签发与兑换成功，以及 state 失败、ticket 重放、签名失败等安全事件全量留痕；state 校验失败、ticket 重放、签名失败同时有 Warn 级运行日志。
+- **重启影响** — 默认内存存储下重启会丢弃进行中的登录流程，用户重扫即可；多实例部署切换 Redis 后不受单实例重启影响。
 
 ## 常见问题
 
@@ -325,10 +327,11 @@ wecom-auth-center/
 ├── server/                     Go 服务
 │   ├── cmd/server/             服务入口（配置加载、优雅退出）
 │   ├── internal/
+│   │   ├── audit/              安全审计事件独立落盘（JSON 行）
 │   │   ├── config/             YAML 配置加载与强校验
 │   │   ├── handler/            /login /callback /api/verify /healthz 与路由装配
 │   │   ├── service/            wecom.go（token 缓存/换取身份/mock）、sso.go（state/ticket）
-│   │   ├── store/              短时效存储抽象与内存实现
+│   │   ├── store/              短时效存储接口与内存/Redis 实现
 │   │   └── middleware/         请求日志、panic 恢复、IP 限流
 │   ├── web/static/             企业微信域名校验文件等静态资源
 │   ├── config.example.yaml     配置模板（config.yaml 已被 git 排除）

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jerion/wecom-auth-center/server/internal/audit"
 	"github.com/jerion/wecom-auth-center/server/internal/config"
 	"github.com/jerion/wecom-auth-center/server/internal/handler"
 	"github.com/jerion/wecom-auth-center/server/internal/service"
@@ -60,11 +61,14 @@ func main() {
 		wcom = service.NewRealClient(cfg.Wecom.CorpID, cfg.Wecom.AgentID, cfg.Wecom.Secret, cfg.Wecom.FetchName)
 	}
 
-	st := store.NewMemory(time.Now)
+	st := buildStore(cfg, logger)
+	auditLog := openAudit(cfg, logger)
+	defer auditLog.Close()
+
 	ssoSvc := service.NewSSO(st, cfg.TTL.State, cfg.TTL.Ticket)
 	srv := &http.Server{
 		Addr:              cfg.Server.Listen,
-		Handler:           handler.Router(handler.New(cfg, ssoSvc, wcom, logger)),
+		Handler:           handler.Router(handler.New(cfg, ssoSvc, wcom, logger, auditLog)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -88,4 +92,32 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("优雅关闭失败", "error", err)
 	}
+}
+
+// buildStore 按配置选择存储驱动，Redis 模式启动时先验证连通性。
+func buildStore(cfg *config.Config, logger *slog.Logger) store.Store {
+	if cfg.Store.Driver != "redis" {
+		return store.NewMemory(time.Now)
+	}
+	rs := store.NewRedis(cfg.Store.Redis.Addr, cfg.Store.Redis.Password, cfg.Store.Redis.DB, logger, time.Now)
+	if err := rs.Ping(context.Background()); err != nil {
+		logger.Error("Redis 连接失败", "addr", cfg.Store.Redis.Addr, "error", err)
+		os.Exit(1)
+	}
+	logger.Info("已启用 Redis 存储", "addr", cfg.Store.Redis.Addr, "db", cfg.Store.Redis.DB)
+	return rs
+}
+
+// openAudit 按配置初始化审计日志，失败时拒绝启动避免安全事件失录。
+func openAudit(cfg *config.Config, logger *slog.Logger) *audit.Logger {
+	if !cfg.Audit.Enabled {
+		return nil
+	}
+	auditLog, err := audit.New(cfg.Audit.Path)
+	if err != nil {
+		logger.Error("打开审计日志文件失败", "path", cfg.Audit.Path, "error", err)
+		os.Exit(1)
+	}
+	logger.Info("已启用审计日志", "path", cfg.Audit.Path)
+	return auditLog
 }

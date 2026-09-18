@@ -123,8 +123,8 @@ type Store interface {
 }
 ```
 
-- 第一阶段 `MemoryStore`：`map` + 互斥锁 + 过期惰性清理，单实例部署。
-- 第三阶段 `RedisStore`：`SET key val EX ttl` + Lua/GETDEL 原子取出，支持多实例。
+- `MemoryStore`（默认）：`map` + 互斥锁 + 过期惰性清理，单实例部署。
+- `RedisStore`（`store.driver: redis`）：`SET key val EX ttl` + `GETDEL` 原子取出（要求 Redis 6.2+），多实例共享；键名 `wecom-auth-center:state:*` / `wecom-auth-center:ticket:*`，值为记录 JSON；读取故障按凭证不存在处理（fail closed），启动时 Ping 快速失败。
 
 `access_token` 缓存随实例内存即可；引入多实例后亦无需共享（各自获取不会互相挤掉，企业微信 token 有效期内重复获取返回相同值）。
 
@@ -137,7 +137,7 @@ type Store interface {
 5. **密钥管理**：企业微信 `secret` 与各 `app_secret` 只存服务端配置文件（权限 600），不进 git，不入前端。
 6. **传输**：全站 HTTPS，Nginx 开启 HSTS。
 7. **限流**：`/login`、`/api/verify` 按 IP 简单令牌桶，防止刷接口探测。
-8. **审计日志**：记录 state 校验失败、ticket 重放、verify 签名失败、企业微信接口错误等安全事件。
+8. **审计日志**：运行日志含 state 校验失败、ticket 重放、verify 签名失败等 Warn 事件；开启 `audit.enabled` 后另有独立 JSON 行审计文件，完整覆盖登录发起（`login_start`）、ticket 签发（`ticket_issue`）、兑换成功（`verify_ok`）与全部拒绝事件（`state_reject` / `verify_app_reject` / `verify_sign_reject` / `verify_ts_reject` / `ticket_reject` / `ticket_mismatch`），事件名在 `msg` 字段便于检索告警。
 
 ## 已知限制与演进方向
 

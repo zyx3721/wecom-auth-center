@@ -62,7 +62,8 @@ wecom-auth-center/
 │   ├── internal/config/        配置加载与校验
 │   ├── internal/handler/       HTTP 接口与路由装配
 │   ├── internal/service/       企微客户端（token/身份/mock）与 state/ticket
-│   ├── internal/store/         短时效存储抽象与内存实现
+│   ├── internal/store/         短时效存储接口与内存/Redis 实现
+│   ├── internal/audit/         安全审计事件独立落盘
 │   ├── internal/middleware/    日志、恢复、限流
 │   ├── web/static/             企微域名校验文件等静态资源
 │   └── config.example.yaml     配置模板
@@ -328,6 +329,26 @@ server {
 | `login_per_minute` | `30` | `/login` 每 IP 每分钟上限 |
 | `verify_per_minute` | `120` | `/api/verify` 每 IP 每分钟上限 |
 
+## 5.6 store
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `driver` | `memory` | 存储驱动：`memory` 进程内存（单实例）；`redis` 多实例共享（要求 Redis 6.2+ 支持 `GETDEL`），启动时 Ping 校验连通，失败拒绝启动 |
+| `redis.addr` | — | Redis 地址，`driver: redis` 时必填 |
+| `redis.password` | 空 | Redis 密码，无则留空 |
+| `redis.db` | `0` | Redis 逻辑库编号 |
+
+state/ticket 以 JSON 存于 `wecom-auth-center:state:*` 与 `wecom-auth-center:ticket:*` 键，TTL 与 `ttl` 配置一致；消费即 `GETDEL` 删除。Redis 读取故障按凭证不存在处理（fail closed），对应请求失败用户重试即可。数据均为秒级时效，Redis 无需持久化配置。
+
+## 5.7 audit
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enabled` | `false` | 开启后安全审计事件独立落盘为 JSON 行文件 |
+| `path` | `audit.log` | 审计文件路径；Docker 部署须指向挂载的可写目录（镜像内以非 root 运行） |
+
+开启后记录事件：`login_start`（登录发起）、`ticket_issue`（ticket 签发）、`verify_ok`（兑换成功）、`state_reject`（state 校验失败）、`verify_app_reject`（白名单外 app）、`verify_sign_reject`（签名失败）、`verify_ts_reject`（时间戳超差）、`ticket_reject`（ticket 重放/过期/不存在）、`ticket_mismatch`（ticket 归属不匹配）。文件打开失败时服务拒绝启动，避免安全事件失录；轮转建议交给系统 logrotate。
+
 # 六、HTTP 接口与调试
 
 ## 6.1 接口清单
@@ -391,6 +412,14 @@ curl -s -X POST https://auth.example.com/api/verify \
 ## 8.1 日志
 
 服务输出 JSON 结构化日志（slog）：每个请求记录方法、路径、状态、耗时与客户端 IP；安全事件（state 校验失败、ticket 重放、verify 签名失败）有独立 Warn 日志，可按 `msg` 字段接入采集告警。
+
+开启 `audit.enabled` 后另有独立审计文件（JSON 行，事件名在 `msg` 字段），完整记录登录发起、ticket 签发/兑换成功与全部拒绝类安全事件，与运行日志互不干扰，建议单独采集长期留存。文件需落在服务账号可写目录；Docker 部署示例：
+
+```bash
+# 挂载可写目录并在配置中指向它
+docker run ... -v /opt/wecom-auth-center/audit:/app/audit ... 
+# config.yaml: audit.enabled: true, audit.path: "/app/audit/audit.log"
+```
 
 ## 8.2 故障对照表
 

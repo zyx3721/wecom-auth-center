@@ -49,6 +49,20 @@ type Config struct {
 		VerifyTSSkew time.Duration `yaml:"verify_ts_skew"`
 	} `yaml:"ttl"`
 
+	Store struct {
+		Driver string `yaml:"driver"` // memory | redis，多实例部署选 redis
+		Redis  struct {
+			Addr     string `yaml:"addr"`
+			Password string `yaml:"password"`
+			DB       int    `yaml:"db"`
+		} `yaml:"redis"`
+	} `yaml:"store"`
+
+	Audit struct {
+		Enabled bool   `yaml:"enabled"` // true 时安全事件独立落盘审计文件
+		Path    string `yaml:"path"`
+	} `yaml:"audit"`
+
 	Apps map[string]*AppConfig `yaml:"apps"`
 
 	RateLimit struct {
@@ -99,6 +113,12 @@ func (c *Config) applyDefaults() {
 	if c.RateLimit.VerifyPerMinute == 0 {
 		c.RateLimit.VerifyPerMinute = 120
 	}
+	if c.Store.Driver == "" {
+		c.Store.Driver = "memory"
+	}
+	if c.Audit.Path == "" {
+		c.Audit.Path = "audit.log"
+	}
 }
 
 func (c *Config) validate() error {
@@ -114,6 +134,10 @@ func (c *Config) validate() error {
 		return fmt.Errorf("wecom.secret 不能为空")
 	case c.Wecom.Mode != ModeQrcode && c.Wecom.Mode != ModeInside:
 		return fmt.Errorf("wecom.mode 只能是 qrcode 或 inside")
+	case c.Store.Driver != "memory" && c.Store.Driver != "redis":
+		return fmt.Errorf("store.driver 只能是 memory 或 redis")
+	case c.Store.Driver == "redis" && c.Store.Redis.Addr == "":
+		return fmt.Errorf("store.driver 为 redis 时必须配置 store.redis.addr")
 	case len(c.Apps) == 0:
 		return fmt.Errorf("至少需要登记一个 apps 业务系统")
 	}

@@ -82,7 +82,7 @@ Written in Go with no external database — `go build` produces a single deploya
 - **`ticket` handover** — after exchanging `code` for `userid`, the auth center issues a 60-second one-time ticket and 302s back to the business system.
 - **`verify` gate** — the business backend calls `/api/verify` signed with its `app_secret` to redeem the ticket; browsers never touch verify.
 - **Session ownership** — the auth center issues no global session; every system establishes its own Session/JWT after verification, and logouts stay independent.
-- **Where data lives** — state/ticket are second-lived records kept in process memory by default; a Redis implementation slots into the `Store` interface for multi-instance deployments.
+- **Where data lives** — state/ticket are second-lived records kept in process memory by default; set `store.driver: redis` to share them across instances, with optional structured audit logging.
 
 ## Tech stack
 
@@ -91,7 +91,7 @@ Written in Go with no external database — `go build` produces a single deploya
 | Language | Go 1.26+ (standard library `net/http` only, Go 1.22+ method routing) |
 | External deps | [gopkg.in/yaml.v3](https://github.com/go-yaml/yaml) (the only third-party dependency) |
 | WeCom entry | wwlogin QR (PC) / in-app OAuth `snsapi_base` (WeCom browser), config-switchable |
-| Storage | In-process memory + TTL (default); Redis behind the `Store` interface when needed |
+| Storage | In-process memory (default) or Redis (`SET EX`+`GETDEL`), configurable; choose Redis for multi-instance |
 | Deployment | Single binary + systemd, or a multi-stage Docker image |
 
 ## Quick start
@@ -137,6 +137,8 @@ docker run -d \
 ```
 
 Prepare `config.yaml` on the host first (copy from `server/config.example.yaml`, set `wecom.mock: false`, fill in corpid/secret and the app whitelist; the file holds secrets — keep it mode 600). Every field is documented in [docs/manual.md](docs/manual.md).
+
+> Optional: for multi-instance deployments set `store.driver: redis` so in-flight logins are shared across instances; to enable the audit log set `audit.enabled` — under Docker the audit file must live in a mounted writable directory (e.g. add `-v /opt/wecom-auth-center/audit:/app/audit` and set `audit.path`), otherwise the service refuses to start. See [docs/manual.md](docs/manual.md) (Chinese), chapter 5 and section 8.1.
 
 Service management:
 
@@ -275,8 +277,8 @@ whitelist or nothing: unknown app → 400, redirect limited to in-app paths
 - **HTTPS everywhere** — a hard requirement of WeCom trusted domains; HSTS enabled in the nginx sample.
 - **Least-privilege keys** — business systems hold only their own `app_secret`, valid solely for verify signatures.
 - **Rate limiting** — `/login` 30/min/IP and `/api/verify` 120/min/IP by default, tunable in config.
-- **Audit trail** — failed state checks, ticket replays and signature failures all produce structured logs.
-- **Restart semantics** — with in-memory storage a restart drops in-flight logins (users simply rescan); switch to Redis for multi-instance deployments.
+- **Audit trail** — optional dedicated JSON-lines audit file covering login starts, ticket issuance/redemption, plus failed state checks, ticket replays and signature failures (also Warn-level runtime logs).
+- **Restart semantics** — with in-memory storage a restart drops in-flight logins (users simply rescan); Redis-backed deployments are unaffected by a single instance restarting.
 
 ## FAQ
 
@@ -319,10 +321,11 @@ wecom-auth-center/
 ├── server/                     Go service
 │   ├── cmd/server/             entrypoint (config loading, graceful shutdown)
 │   ├── internal/
+│   │   ├── audit/              dedicated JSON-lines security audit log
 │   │   ├── config/             YAML config loading & strict validation
 │   │   ├── handler/            /login /callback /api/verify /healthz + routing
 │   │   ├── service/            wecom.go (token cache/identity/mock), sso.go (state/ticket)
-│   │   ├── store/              short-lived store interface + memory implementation
+│   │   ├── store/              short-lived store interface + memory/Redis implementations
 │   │   └── middleware/         request log, panic recovery, IP rate limiting
 │   ├── web/static/             WeCom domain verification file & static assets
 │   ├── config.example.yaml     config template (config.yaml is git-ignored)

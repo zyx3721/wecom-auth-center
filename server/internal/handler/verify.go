@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/jerion/wecom-auth-center/server/internal/middleware"
 )
 
 // verifyRequest 业务系统后端调用 /api/verify 的请求体。
@@ -24,6 +26,7 @@ type verifyRequest struct {
 // 签名校验 -> 时间偏差校验 -> ticket 一次性消费（取出即删）-> 返回身份。
 // 顺序上先验签名再消费 ticket，无效请求不会冲掉有效凭证。
 func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
+	remote := middleware.RealIP(h.cfg.Server.TrustProxy)(r)
 	var req verifyRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req); err != nil {
 		writeVerifyError(w, http.StatusBadRequest, "invalid_body")
@@ -32,6 +35,7 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 
 	app, ok := h.appOf(req.App)
 	if !ok {
+		h.audit.Event("verify_app_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_app")
 		return
 	}
@@ -41,27 +45,32 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !verifySign(req, app.AppSecret) {
-		h.log.Warn("verify 签名校验失败", "app", req.App)
+		h.log.Warn("verify 签名校验失败", "app", req.App, "remote", remote)
+		h.audit.Event("verify_sign_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_sign")
 		return
 	}
 	if skew := h.now().Sub(time.Unix(req.TS, 0)).Abs(); skew > h.cfg.TTL.VerifyTSSkew {
+		h.audit.Event("verify_ts_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "expired_ts")
 		return
 	}
 
 	rec, ok := h.sso.ConsumeTicket(r.Context(), req.Ticket)
 	if !ok {
-		h.log.Warn("ticket 校验失败", "app", req.App)
+		h.log.Warn("ticket 校验失败", "app", req.App, "remote", remote)
+		h.audit.Event("ticket_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_ticket")
 		return
 	}
 	if rec.App != req.App {
-		h.log.Warn("ticket 归属不匹配", "ticket_app", rec.App, "req_app", req.App)
+		h.log.Warn("ticket 归属不匹配", "ticket_app", rec.App, "req_app", req.App, "remote", remote)
+		h.audit.Event("ticket_mismatch", "app", req.App, "ticket_app", rec.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_ticket")
 		return
 	}
 
+	h.audit.Event("verify_ok", "app", req.App, "userid", rec.Userid, "remote", remote)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"userid": rec.Userid,
 		"name":   rec.Name,

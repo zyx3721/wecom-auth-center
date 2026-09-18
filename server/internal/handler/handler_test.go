@@ -19,7 +19,7 @@ func newTestHandler(t *testing.T) *Handler {
 	t.Helper()
 	cfg := newTestConfig()
 	cfg.Wecom.Mock = true
-	return New(cfg, newSSO(cfg), service.MockClient{}, nil)
+	return New(cfg, newSSO(cfg), service.MockClient{}, nil, nil)
 }
 
 func newTestConfig() *config.Config {
@@ -100,7 +100,7 @@ func TestLoginRejectsUnknownApp(t *testing.T) {
 
 func TestLoginRedirectsToWeComQRLogin(t *testing.T) {
 	cfg := newTestConfig() // 非 mock，验证真实 302 目标
-	h := New(cfg, newSSO(cfg), service.MockClient{}, nil)
+	h := New(cfg, newSSO(cfg), service.MockClient{}, nil, nil)
 
 	loc := loginFor(t, h, "/login?app=oa")
 	if loc.Scheme != "https" || loc.Host != "login.work.weixin.qq.com" || loc.Path != "/wwlogin/sso/login" {

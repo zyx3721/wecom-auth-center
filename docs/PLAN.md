@@ -1,6 +1,6 @@
 # 分阶段实施计划
 
-当前状态：**阶段〇未做（按皇上指示跳过）、阶段一已完成并通过本地 mock 端到端演练**。按阶段推进，每阶段结束有明确验证点。
+当前状态：**阶段〇未做（按皇上指示跳过）、阶段一已完成并通过本地 mock 端到端演练、阶段三已完成（Redis 存储与审计日志；限流参数化随阶段一交付，Prometheus 为可选项未实施）**。按阶段推进，每阶段结束有明确验证点。
 
 ## 阶段一：认证中心 MVP（约 1–2 天）—— ✅ 已完成
 
@@ -45,16 +45,20 @@
 - 真实扫码登录走通全流程；篡改 ticket / 复用 ticket / 过期 ticket 均被拒绝；verify 错误签名返回 401。
 - 浏览器验证登录后会话正常、退出后重新发起流程正常。
 
-## 阶段三：加固（约 1 天）
+## 阶段三：加固（约 1 天）—— ✅ 已完成（Prometheus 监控为可选项未实施）
 
 任务：
 
-1. `store.RedisStore`（`SET ... EX` + `GETDEL`），配置切换，为多实例部署留出能力。
-2. 审计日志结构化输出（state 失败 / ticket 重放 / 签名失败单独标记）。
-3. 限流参数化；`/api/verify` 增加失败次数监控指标（Prometheus 文本接口可选）。
-4. 部署文档完善：备份与恢复仅涉及配置文件；发布流程（单二进制 + systemd）。
+1. `store.RedisStore`（`SET ... EX` + `GETDEL`），配置切换，为多实例部署留出能力。✅
+2. 审计日志结构化输出（state 失败 / ticket 重放 / 签名失败单独标记）。✅
+3. 限流参数化；`/api/verify` 增加失败次数监控指标（Prometheus 文本接口可选）。✅ 限流参数化随阶段一交付；Prometheus 未实施，留作后续可选。
+4. 部署文档完善：备份与恢复仅涉及配置文件；发布流程（单二进制 + systemd）。✅ 随 v1.0.0 文档与发布流水线交付。
 
-验证方式：重复回调、重放攻击用例全部被拒并有日志；压测 `/api/verify` 正常签名 QPS 满足内部需要。
+验证结果（`go test ./...` 七包全绿 + mock 端到端演练）：
+
+- 单元测试：Redis 实现（miniredis）覆盖往返存取、取出即删（重放拒绝）、TTL 过期、数据损坏与宕机 fail closed；审计包覆盖 JSON 行落盘与 nil 安全；配置覆盖 driver 校验（非法驱动、redis 缺地址拒绝，redis + audit 合法加载）。
+- 端到端演练（mock 模式 + 审计开启）：login → 模拟扫码 → callback → verify 全链路审计文件依次落盘 `login_start` / `ticket_issue` / `verify_ok`；ticket 重放 `ticket_reject`、错误签名 `verify_sign_reject` 均有审计与 Warn 运行日志。
+- fail-fast 演练：审计文件不可写时拒绝启动；`store.driver: redis` 且 Redis 不可达时启动即报「Redis 连接失败」退出（exit 1）。
 
 ## 阶段四（可选）：多系统单点登录
 
