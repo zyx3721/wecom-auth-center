@@ -42,6 +42,13 @@ func (s *Redis) Ping(ctx context.Context) error {
 	return s.client.Ping(ctx).Err()
 }
 
+// HealthCheck 探测 Redis 连通性（2 秒超时），供监控页展示在线状态。
+func (s *Redis) HealthCheck(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	return s.client.Ping(ctx).Err()
+}
+
 // Close 释放底层连接。
 func (s *Redis) Close() error {
 	return s.client.Close()

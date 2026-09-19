@@ -9,24 +9,33 @@ import (
 
 	"github.com/jerion/wecom-auth-center/server/internal/audit"
 	"github.com/jerion/wecom-auth-center/server/internal/config"
+	"github.com/jerion/wecom-auth-center/server/internal/metrics"
 	"github.com/jerion/wecom-auth-center/server/internal/service"
+	"github.com/jerion/wecom-auth-center/server/internal/store"
 )
 
 // Handler 聚合路由处理所需的依赖。
 type Handler struct {
-	cfg   *config.Config
-	sso   *service.SSO
-	wcom  service.WeCom
-	now   func() time.Time
-	log   *slog.Logger
-	audit *audit.Logger
+	cfg     *config.Config
+	sso     *service.SSO
+	wcom    service.WeCom
+	now     func() time.Time
+	log     *slog.Logger
+	audit   *audit.Logger
+	metrics *metrics.Metrics
+	st      store.Store
 }
 
-func New(cfg *config.Config, sso *service.SSO, wcom service.WeCom, log *slog.Logger, auditLog *audit.Logger) *Handler {
+func New(cfg *config.Config, sso *service.SSO, wcom service.WeCom, log *slog.Logger, auditLog *audit.Logger, met *metrics.Metrics, st store.Store) *Handler {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Handler{cfg: cfg, sso: sso, wcom: wcom, now: time.Now, log: log, audit: auditLog}
+	return &Handler{cfg: cfg, sso: sso, wcom: wcom, now: time.Now, log: log, audit: auditLog, metrics: met, st: st}
+}
+
+// track 监控事件计数，未接入计数器时为空操作
+func (h *Handler) track(event string) {
+	h.metrics.Inc(event)
 }
 
 // appOf 查白名单，返回业务系统配置。

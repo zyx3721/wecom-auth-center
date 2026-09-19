@@ -63,6 +63,12 @@ type Config struct {
 		Path    string `yaml:"path"`
 	} `yaml:"audit"`
 
+	Status struct {
+		Enabled  bool   `yaml:"enabled"` // true 时启用 /status 监控页与 /api/status 接口
+		Token    string `yaml:"token"`   // 页面与接口的访问令牌
+		DataPath string `yaml:"data_path"`
+	} `yaml:"status"`
+
 	Apps map[string]*AppConfig `yaml:"apps"`
 
 	RateLimit struct {
@@ -119,6 +125,9 @@ func (c *Config) applyDefaults() {
 	if c.Audit.Path == "" {
 		c.Audit.Path = "audit.log"
 	}
+	if c.Status.DataPath == "" {
+		c.Status.DataPath = "status-metrics.json"
+	}
 }
 
 func (c *Config) validate() error {
@@ -138,6 +147,8 @@ func (c *Config) validate() error {
 		return fmt.Errorf("store.driver 只能是 memory 或 redis")
 	case c.Store.Driver == "redis" && c.Store.Redis.Addr == "":
 		return fmt.Errorf("store.driver 为 redis 时必须配置 store.redis.addr")
+	case c.Status.Enabled && c.Status.Token == "":
+		return fmt.Errorf("status.enabled 为 true 时必须配置 status.token")
 	case len(c.Apps) == 0:
 		return fmt.Errorf("至少需要登记一个 apps 业务系统")
 	}

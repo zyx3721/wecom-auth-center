@@ -351,6 +351,16 @@ state/ticket 以 JSON 存于 `wecom-auth-center:state:*` 与 `wecom-auth-center:
 
 开启后记录事件：`login_start`（登录发起）、`ticket_issue`（ticket 签发）、`verify_ok`（兑换成功）、`state_reject`（state 校验失败）、`verify_app_reject`（白名单外 app）、`verify_sign_reject`（签名失败）、`verify_ts_reject`（时间戳超差）、`ticket_reject`（ticket 重放/过期/不存在）、`ticket_mismatch`（ticket 归属不匹配）。文件打开失败时服务拒绝启动，避免安全事件失录；轮转建议交给系统 logrotate。
 
+## 5.8 status
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enabled` | `false` | 开启后提供 `/status` 监控页与 `/api/status` 数据接口 |
+| `token` | — | 访问令牌，`enabled: true` 时必填（建议 `openssl rand -hex 16` 生成），以 `?token=` 方式校验 |
+| `data_path` | `status-metrics.json` | 统计持久化文件，每 60 秒原子落盘、启动时加载，重启后历史保留；Docker 部署需挂载可写目录 |
+
+监控页展示：近 7 天登录发起/登录成功、今日登录发起/兑换成功 4 张统计卡，近 7 天趋势图（页面内自绘 SVG，无外部图表库），今日拒绝事件明细（state 失败/签名失败/ticket 拒绝等），版本与构建信息、运行时长、存储驱动与 Redis 在线状态，30 秒自动刷新。统计按日分桶保留 7 天，与审计事件同名同点位采集。
+
 # 六、HTTP 接口与调试
 
 ## 6.1 接口清单
@@ -360,6 +370,8 @@ state/ticket 以 JSON 存于 `wecom-auth-center:state:*` 与 `wecom-auth-center:
 | GET | `/login?app=oa&redirect=/path` | 业务系统 302 用户 | 白名单校验 → 登记 state → 302 企微授权页（mock 模式 302 模拟扫码页） |
 | GET | `/callback?code=&state=` | 企业微信 | 消费 state → code 换 userid → 签发 ticket → 302 回 `app.callback_path` |
 | POST | `/api/verify` | 业务系统后端 | 签名/时间偏差校验 → ticket 一次性消费 → `{userid, name}` |
+| GET | `/status?token=` | 管理员浏览器 | 监控页（`status.enabled` 开启后可用） |
+| GET | `/api/status?token=` | 监控页 | 统计、运行信息与存储健康（Token 保护） |
 | GET | `/healthz` | 探活 | `ok` |
 
 ## 6.2 verify 签名算法
@@ -442,6 +454,15 @@ docker run ... -v /opt/wecom-auth-center/audit:/app/audit ...
 2. Docker：`docker pull` 新镜像后重新 `docker run`；二进制：替换可执行文件后 `systemctl restart wecom-auth-center`；
 3. 执行 `./wecom-auth-center -v`（Docker 用 `docker exec <容器名> /app/wecom-auth-center -v`）确认版本已更新，该参数同样支持 `--version` 写法；
 4. 观察 `/healthz` 与日志恢复正常。
+
+## 8.4 监控页
+
+开启 `status.enabled` 并配置 `status.token` 后，浏览器访问 `https://auth域名/status?token=你的令牌` 查看运行状态：近 7 天与今日的登录发起、ticket 签发、兑换成功统计，今日拒绝事件（state 失败 / 签名失败 / ticket 拒绝），版本与构建信息、运行时长、存储驱动与 Redis 在线状态，每 30 秒自动刷新。
+
+- 数据接口为同令牌的 `/api/status?token=`，可供脚本采集；令牌错误返回 403，`status.enabled: false` 时按 404 处理；
+- 统计与审计事件同名同点位采集，按日分桶保留 7 天，每 60 秒落盘至 `status.data_path`，重启自动恢复；
+- Docker 部署时 `data_path` 须落在挂载的可写目录，例如追加 `-v /opt/wecom-auth-center/data:/app/data` 并设 `data_path: "/app/data/status-metrics.json"`；
+- 页面仅含聚合计数与运行信息，不含密钥与用户身份；如需限制访问范围，可在 Nginx 反代上对 `/status` 与 `/api/status` 加来源 IP 或 Basic Auth 控制。
 
 # 九、安全建议
 

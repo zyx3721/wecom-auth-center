@@ -1,6 +1,6 @@
 # 分阶段实施计划
 
-当前状态：**阶段〇未做（按皇上指示跳过）、阶段一已完成并通过本地 mock 端到端演练、阶段三已完成（Redis 存储与审计日志；限流参数化随阶段一交付，Prometheus 为可选项未实施）**。按阶段推进，每阶段结束有明确验证点。
+当前状态：**阶段〇未做（按皇上指示跳过）、阶段一已完成并通过本地 mock 端到端演练、阶段三已完成（Redis 存储与审计日志；限流参数化随阶段一交付，Prometheus 为可选项未实施）、阶段五已完成（内置监控页）**。按阶段推进，每阶段结束有明确验证点。
 
 ## 阶段一：认证中心 MVP（约 1–2 天）—— ✅ 已完成
 
@@ -65,6 +65,30 @@
 1. 认证中心为浏览器下发自身会话 Cookie（HttpOnly + Secure，域 `auth.example.com`）。
 2. 已登录用户再次访问 `/login?app=xx` 免扫码，直接发 ticket 302 返回。
 3. 各业务系统接入后即获得「一次扫码，多系统通行」；登出暂不做跨系统广播。
+
+## 阶段五：内置轻量监控页（KMS 风格）—— ✅ 已完成
+
+目标：认证中心内置 `GET /status` 监控页与 `GET /api/status` 数据接口，KMS 状态页同款布局（顶部状态条、4 张统计卡、近 7 天趋势图、节点监控与服务信息），30 秒自动刷新。零新增端口、零新增第三方依赖，趋势图为页面内自绘 SVG。
+
+方案要点：
+
+1. **统计采集** `internal/metrics` — 与审计事件同名埋点（`login_start` / `ticket_issue` / `verify_ok` / 6 类拒绝事件），按日分桶内存计数，保留最近 7 天，快照输出今日/累计/逐日序列。
+2. **文件持久化** — 计数每 60 秒原子落盘（临时文件 + rename）至 `status.data_path`（默认 `status-metrics.json`），启动时加载，重启历史保留；Docker 部署需挂载可写目录。
+3. **构建信息抽取** — 新增 `internal/buildinfo` 承载 version/commit/buildDate（CI `-ldflags -X` 注入点随迁），监控页展示版本与构建时间。
+4. **存储健康检查** — `store` 包新增 `HealthChecker` 接口：Redis 实现为 Ping（2s 超时），内存实现恒为健康；监控页展示存储驱动与在线状态。
+5. **访问控制** — 页面与接口均要求 `?token=`（恒定时间比较），`status.enabled: false` 时按 404 处理；`status.enabled: true` 时 `token` 必填（配置校验拒绝空值）。
+6. **配置** — 新增 `status` 段：`enabled`（默认 false）/ `token` / `data_path`（默认 `status-metrics.json`）。
+7. **接口** — `/api/status` 输出：服务信息（版本/commit/构建时间/Go 版本/平台/主机名/运行时长/监听地址/企微模式）、存储驱动与 Redis 在线状态、4 张卡片（近 7 天登录发起/登录成功、今日登录发起/今日兑换成功）、今日拒绝事件明细、近 7 天逐日序列。
+
+验证方式：
+
+- 单元测试：metrics 计数/裁剪/并发/落盘往返；handler token 三态（缺/错/对）与 JSON 结构；`go test ./...` 全绿。
+- 端到端演练：mock 模式走完整登录链路后，`/api/status` 计数与链路一致，`/status` 页面正常渲染。
+
+验证结果（`go test -count=1 ./...` 九包全绿 + mock 端到端演练）：
+
+- 单元测试：metrics 覆盖计数/快照、窗口裁剪（跨窗口旧桶删除、窗口内保留）、Save/Load 往返、并发计数、nil 安全；handler 覆盖 token 缺/错/对三态、页面渲染、未启用 404、埋点计数联动；config 覆盖 enabled 缺 token 拒绝与 data_path 默认值。
+- 端到端演练（mock 模式 + 监控开启）：完整登录链路后 `/api/status` 输出与链路一致（loginsToday=1、tickets7d=1、verifyOkToday=1、ticket_reject=1、7 天连续序列），`/status` 无 token 403 / 错 token 403 / 对 token 200；统计文件按 60 秒周期落盘且内容正确，重启可恢复。
 
 ## 风险与对策
 

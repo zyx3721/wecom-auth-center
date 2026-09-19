@@ -19,6 +19,8 @@ func Router(h *Handler) http.Handler {
 	mux.HandleFunc("GET /callback", h.Callback)
 	mux.Handle("POST /api/verify", verifyLimit.Middleware(extractIP, http.HandlerFunc(h.Verify)))
 	mux.HandleFunc("GET /healthz", h.Healthz)
+	mux.HandleFunc("GET /status", h.Status)
+	mux.HandleFunc("GET /api/status", h.StatusAPI)
 
 	if h.cfg.Wecom.Mock {
 		mux.HandleFunc("GET /mock/scan", h.MockScan)

@@ -19,7 +19,7 @@ RUN go mod download
 
 COPY server/ ./
 
-RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}" -o wecom-auth-center ./cmd/server
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/jerion/wecom-auth-center/server/internal/buildinfo.Version=${VERSION} -X github.com/jerion/wecom-auth-center/server/internal/buildinfo.Commit=${COMMIT} -X github.com/jerion/wecom-auth-center/server/internal/buildinfo.BuildDate=${BUILD_DATE}" -o wecom-auth-center ./cmd/server
 
 ############################
 # 2) runtime

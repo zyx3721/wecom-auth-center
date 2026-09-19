@@ -39,6 +39,13 @@ audit:
   enabled: false
   path: "audit.log"
 
+# 监控页：开启后访问 https://auth域名/status?token=xxx 查看登录统计与运行状态（数据接口 /api/status）
+# token 建议用 openssl rand -hex 16 生成；data_path 为统计持久化文件，Docker 部署需挂载可写目录
+status:
+  enabled: false
+  token: "REPLACE_WITH_openssl_rand_hex_16"
+  data_path: "status-metrics.json"
+
 # 业务系统白名单：app 标识 -> 回调域名。请求参数中永远不接受完整 URL。
 # domain 支持 https（推荐）与 http（仅建议内网使用，ticket 将明文传输，启动时有 Warn 提示）
 apps:

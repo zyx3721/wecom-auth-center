@@ -49,6 +49,9 @@ func TestLoadValid(t *testing.T) {
 	if cfg.Audit.Path != "audit.log" {
 		t.Fatalf("审计文件默认路径应为 audit.log，实际 %s", cfg.Audit.Path)
 	}
+	if cfg.Status.DataPath != "status-metrics.json" {
+		t.Fatalf("监控统计默认路径应为 status-metrics.json，实际 %s", cfg.Status.DataPath)
+	}
 }
 
 func TestLoadRejects(t *testing.T) {
@@ -65,6 +68,9 @@ apps:`, 1),
   driver: redis
 apps:`, 1),
 		"domain 协议非法": strings.Replace(validYAML, `https://oa.example.com`, "ftp://oa.example.com", 1),
+		"status 缺 token": strings.Replace(validYAML, "apps:", `status:
+  enabled: true
+apps:`, 1),
 	}
 	for name, y := range cases {
 		t.Run(name, func(t *testing.T) {

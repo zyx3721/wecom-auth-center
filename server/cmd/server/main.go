@@ -16,22 +16,17 @@ import (
 	"time"
 
 	"github.com/jerion/wecom-auth-center/server/internal/audit"
+	"github.com/jerion/wecom-auth-center/server/internal/buildinfo"
 	"github.com/jerion/wecom-auth-center/server/internal/config"
 	"github.com/jerion/wecom-auth-center/server/internal/handler"
+	"github.com/jerion/wecom-auth-center/server/internal/metrics"
 	"github.com/jerion/wecom-auth-center/server/internal/service"
 	"github.com/jerion/wecom-auth-center/server/internal/store"
 )
 
-// version、commit、buildDate 为构建信息，由 CI 通过 -ldflags -X 注入，源码直接编译时使用默认值
-var (
-	version   = "dev"
-	commit    = "unknown"
-	buildDate = "unknown"
-)
-
 // versionText 组装 -v/--version 输出的版本信息文本
 func versionText() string {
-	return fmt.Sprintf("wecom-auth-center %s\ncommit: %s\nbuild: %s\ngo: %s\n", version, commit, buildDate, runtime.Version())
+	return fmt.Sprintf("wecom-auth-center %s\ncommit: %s\nbuild: %s\ngo: %s\n", buildinfo.Version, buildinfo.Commit, buildinfo.BuildDate, runtime.Version())
 }
 
 // setUsage 自定义 -h/--help 输出：-v 与 -version 合并一行，各参数描述统一换行缩进对齐
@@ -87,10 +82,14 @@ func main() {
 	auditLog := openAudit(cfg, logger)
 	defer auditLog.Close()
 
+	met := metrics.New(time.Now)
+	stopMetricsSave := startMetricsSaver(cfg, met, logger)
+	defer stopMetricsSave()
+
 	ssoSvc := service.NewSSO(st, cfg.TTL.State, cfg.TTL.Ticket)
 	srv := &http.Server{
 		Addr:              cfg.Server.Listen,
-		Handler:           handler.Router(handler.New(cfg, ssoSvc, wcom, logger, auditLog)),
+		Handler:           handler.Router(handler.New(cfg, ssoSvc, wcom, logger, auditLog, met, st)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -151,4 +150,39 @@ func openAudit(cfg *config.Config, logger *slog.Logger) *audit.Logger {
 	}
 	logger.Info("已启用审计日志", "path", cfg.Audit.Path)
 	return auditLog
+}
+
+// startMetricsSaver 启用监控时加载历史计数并周期落盘，返回停机时执行的收尾函数
+func startMetricsSaver(cfg *config.Config, met *metrics.Metrics, logger *slog.Logger) func() {
+	if !cfg.Status.Enabled {
+		return func() {}
+	}
+	if err := met.Load(cfg.Status.DataPath); err != nil {
+		logger.Warn("监控统计加载失败，从零开始累计", "path", cfg.Status.DataPath, "error", err)
+	}
+	logger.Info("已启用监控页", "path", "/status", "data_path", cfg.Status.DataPath)
+	stop := make(chan struct{})
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := met.Save(cfg.Status.DataPath); err != nil {
+					logger.Warn("监控统计落盘失败", "path", cfg.Status.DataPath, "error", err)
+				}
+			case <-stop:
+				return
+			}
+		}
+	}()
+	return func() {
+		close(stop)
+		<-stopped
+		if err := met.Save(cfg.Status.DataPath); err != nil {
+			logger.Warn("监控统计落盘失败", "path", cfg.Status.DataPath, "error", err)
+		}
+	}
 }

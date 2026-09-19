@@ -29,3 +29,8 @@ type Store interface {
 	SaveTicket(ctx context.Context, ticket string, rec TicketRecord, ttl time.Duration) error
 	TakeTicket(ctx context.Context, ticket string) (TicketRecord, bool)
 }
+
+// HealthChecker 支持健康探测的存储实现，监控页用于展示在线状态。
+type HealthChecker interface {
+	HealthCheck(ctx context.Context) error
+}

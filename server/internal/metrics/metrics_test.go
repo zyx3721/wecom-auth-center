@@ -1,0 +1,139 @@
+package metrics
+
+import (
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+)
+
+// clock 可拨动的假时钟
+type clock struct{ current time.Time }
+
+func (c *clock) Now() time.Time { return c.current }
+
+func newTestMetrics(t *testing.T) (*Metrics, *clock) {
+	t.Helper()
+	c := &clock{current: time.Date(2026, 9, 19, 10, 0, 0, 0, time.Local)}
+	return New(c.Now), c
+}
+
+func TestIncAndSnapshot(t *testing.T) {
+	m, c := newTestMetrics(t)
+
+	m.Inc("login_start")
+	m.Inc("login_start")
+	m.Inc("ticket_issue")
+	c.current = c.current.Add(24 * time.Hour)
+	m.Inc("login_start")
+	m.Inc("verify_ok")
+
+	snap := m.Snapshot()
+	if len(snap.Days) != 2 {
+		t.Fatalf("应有两个日桶，实际 %d", len(snap.Days))
+	}
+	if snap.Days[0].Date != "2026-09-19" || snap.Days[0].Counts["login_start"] != 2 {
+		t.Errorf("首日计数不符: %+v", snap.Days[0])
+	}
+	if snap.Days[1].Date != "2026-09-20" || snap.Days[1].Counts["login_start"] != 1 {
+		t.Errorf("次日计数不符: %+v", snap.Days[1])
+	}
+	if snap.Total["login_start"] != 3 || snap.Total["ticket_issue"] != 1 || snap.Total["verify_ok"] != 1 {
+		t.Errorf("累计计数不符: %+v", snap.Total)
+	}
+	if snap.Today["login_start"] != 1 || snap.Today["verify_ok"] != 1 {
+		t.Errorf("今日计数不符: %+v", snap.Today)
+	}
+}
+
+func TestPruneToSevenDays(t *testing.T) {
+	m, c := newTestMetrics(t)
+
+	m.Inc("login_start")
+	c.current = c.current.Add(10 * 24 * time.Hour)
+	m.Inc("login_start")
+
+	snap := m.Snapshot()
+	if len(snap.Days) != 1 {
+		t.Fatalf("窗口外的旧日期桶应被裁剪，实际保留 %d 天", len(snap.Days))
+	}
+	if snap.Total["login_start"] != 1 {
+		t.Errorf("裁剪掉的旧日期不应计入累计: %+v", snap.Total)
+	}
+
+	c.current = c.current.Add(3 * 24 * time.Hour)
+	m.Inc("login_start")
+	if got := len(m.Snapshot().Days); got != 2 {
+		t.Fatalf("窗口内的两个日期桶都应保留，实际 %d", got)
+	}
+}
+
+func TestSaveLoadRoundtrip(t *testing.T) {
+	m, c := newTestMetrics(t)
+	m.Inc("login_start")
+	m.Inc("ticket_issue")
+	c.current = c.current.Add(24 * time.Hour)
+	m.Inc("verify_ok")
+
+	path := filepath.Join(t.TempDir(), "status-metrics.json")
+	if err := m.Save(path); err != nil {
+		t.Fatalf("落盘失败: %v", err)
+	}
+
+	restored := New(c.Now)
+	if err := restored.Load(path); err != nil {
+		t.Fatalf("恢复失败: %v", err)
+	}
+	orig, restoredSnap := m.Snapshot(), restored.Snapshot()
+	if len(orig.Days) != len(restoredSnap.Days) {
+		t.Fatalf("恢复后日桶数不符: %d vs %d", len(orig.Days), len(restoredSnap.Days))
+	}
+	for i := range orig.Days {
+		if orig.Days[i].Date != restoredSnap.Days[i].Date {
+			t.Errorf("第 %d 天日期不符: %s vs %s", i, orig.Days[i].Date, restoredSnap.Days[i].Date)
+		}
+		for event, n := range orig.Days[i].Counts {
+			if restoredSnap.Days[i].Counts[event] != n {
+				t.Errorf("第 %d 天 %s 计数不符: %d vs %d", i, event, n, restoredSnap.Days[i].Counts[event])
+			}
+		}
+	}
+}
+
+func TestLoadMissingFile(t *testing.T) {
+	m, _ := newTestMetrics(t)
+	if err := m.Load(filepath.Join(t.TempDir(), "nope.json")); err != nil {
+		t.Fatalf("文件不存在不应报错: %v", err)
+	}
+}
+
+func TestConcurrentInc(t *testing.T) {
+	m, _ := newTestMetrics(t)
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m.Inc("login_start")
+		}()
+	}
+	wg.Wait()
+	if got := m.Snapshot().Total["login_start"]; got != 50 {
+		t.Fatalf("并发计数应恰为 50，实际 %d", got)
+	}
+}
+
+func TestNilReceiverSafe(t *testing.T) {
+	var m *Metrics
+	m.Inc("login_start")
+	snap := m.Snapshot()
+	if len(snap.Days) != 0 || len(snap.Today) != 0 {
+		t.Errorf("nil 接收者应返回空快照: %+v", snap)
+	}
+	if err := m.Save(filepath.Join(t.TempDir(), "x.json")); err != nil {
+		t.Errorf("nil 接收者 Save 不应报错: %v", err)
+	}
+	if err := m.Load(filepath.Join(t.TempDir(), "x.json")); err != nil {
+		t.Errorf("nil 接收者 Load 不应报错: %v", err)
+	}
+}

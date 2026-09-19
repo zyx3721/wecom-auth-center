@@ -18,6 +18,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirect := sanitizeLocalPath(r.URL.Query().Get("redirect"))
+	h.track("login_start")
 	h.audit.Event("login_start", "app", appID, "redirect", redirect,
 		"remote", middleware.RealIP(h.cfg.Server.TrustProxy)(r))
 
@@ -73,6 +74,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	rec, ok := h.sso.ConsumeState(r.Context(), state)
 	if !ok {
 		h.log.Warn("state 校验失败", "remote", middleware.RealIP(h.cfg.Server.TrustProxy)(r))
+		h.track("state_reject")
 		h.audit.Event("state_reject", "remote", middleware.RealIP(h.cfg.Server.TrustProxy)(r))
 		h.renderError(w, http.StatusForbidden)
 		return
@@ -103,6 +105,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.log.Info("颁发 ticket", "app", rec.App, "userid", ui.Userid)
+	h.track("ticket_issue")
 	h.audit.Event("ticket_issue", "app", rec.App, "userid", ui.Userid)
 	http.Redirect(w, r, buildRedirectURL(app, ticket, rec.Redirect), http.StatusFound)
 }

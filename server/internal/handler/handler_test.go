@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jerion/wecom-auth-center/server/internal/config"
+	"github.com/jerion/wecom-auth-center/server/internal/metrics"
 	"github.com/jerion/wecom-auth-center/server/internal/service"
 	"github.com/jerion/wecom-auth-center/server/internal/store"
 )
@@ -19,7 +20,7 @@ func newTestHandler(t *testing.T) *Handler {
 	t.Helper()
 	cfg := newTestConfig()
 	cfg.Wecom.Mock = true
-	return New(cfg, newSSO(cfg), service.MockClient{}, nil, nil)
+	return New(cfg, newSSO(cfg), service.MockClient{}, nil, nil, metrics.New(time.Now), store.NewMemory(time.Now))
 }
 
 func newTestConfig() *config.Config {
@@ -100,7 +101,7 @@ func TestLoginRejectsUnknownApp(t *testing.T) {
 
 func TestLoginRedirectsToWeComQRLogin(t *testing.T) {
 	cfg := newTestConfig() // 非 mock，验证真实 302 目标
-	h := New(cfg, newSSO(cfg), service.MockClient{}, nil, nil)
+	h := New(cfg, newSSO(cfg), service.MockClient{}, nil, nil, metrics.New(time.Now), store.NewMemory(time.Now))
 
 	loc := loginFor(t, h, "/login?app=oa")
 	if loc.Scheme != "https" || loc.Host != "login.work.weixin.qq.com" || loc.Path != "/wwlogin/sso/login" {

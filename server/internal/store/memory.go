@@ -57,6 +57,11 @@ func (m *Memory) TakeTicket(_ context.Context, ticket string) (TicketRecord, boo
 	return take(m.tickets, ticket, m.now)
 }
 
+// HealthCheck 内存实现恒为健康。
+func (m *Memory) HealthCheck(context.Context) error {
+	return nil
+}
+
 // take 取出即删；过期条目同样删除并视为不存在。
 func take[T any](m map[string]memoryEntry[T], key string, now func() time.Time) (T, bool) {
 	e, ok := m[key]

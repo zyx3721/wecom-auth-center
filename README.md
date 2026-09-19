@@ -256,6 +256,8 @@ systemctl daemon-reload && systemctl enable --now wecom-auth-center
 | GET | `/login?app=oa&redirect=/path` | 业务系统跳转用户 | 校验白名单 → 登记 state → 302 企微扫码页 |
 | GET | `/callback?code=&state=` | 企业微信 | 消费 state → code 换 userid → 发 ticket → 302 回业务系统 |
 | POST | `/api/verify` | 业务系统后端 | 签名校验 → ticket 一次性消费 → 返回 `{userid, name}` |
+| GET | `/status?token=` | 管理员浏览器 | 监控页（`status.enabled` 开启后可用） |
+| GET | `/api/status?token=` | 监控页 | 登录/兑换统计、运行信息与存储健康（Token 保护） |
 | GET | `/healthz` | 探活 | 返回 `ok` |
 
 verify 签名算法（业务系统侧生成，认证中心恒定时间比较）：
@@ -282,6 +284,7 @@ verify 双因子：HMAC-SHA256 签名 + 时间戳偏差 ≤ 60s
 - **密钥最小分发** — 业务系统只持有自己的 `app_secret`，且仅用于 verify 签名，不等于企微凭据。
 - **限流** — `/login` 默认 30 次/分钟/IP，`/api/verify` 120 次/分钟/IP，可在配置调整。
 - **审计日志** — 可选开启独立 JSON 行审计文件：登录发起、ticket 签发与兑换成功，以及 state 失败、ticket 重放、签名失败等安全事件全量留痕；state 校验失败、ticket 重放、签名失败同时有 Warn 级运行日志。
+- **监控页** — 可选开启 `/status`（Token 保护）：登录/兑换统计、今日拒绝事件、版本与存储健康，30 秒自动刷新，详见 [docs/manual.md](docs/manual.md) 8.4 节。
 - **重启影响** — 默认内存存储下重启会丢弃进行中的登录流程，用户重扫即可；多实例部署切换 Redis 后不受单实例重启影响。
 
 ## 常见问题
@@ -328,8 +331,10 @@ wecom-auth-center/
 │   ├── cmd/server/             服务入口（配置加载、优雅退出）
 │   ├── internal/
 │   │   ├── audit/              安全审计事件独立落盘（JSON 行）
+│   │   ├── buildinfo/          构建信息（CI ldflags 注入）
 │   │   ├── config/             YAML 配置加载与强校验
-│   │   ├── handler/            /login /callback /api/verify /healthz 与路由装配
+│   │   ├── handler/            /login /callback /api/verify /status /healthz 与路由装配
+│   │   ├── metrics/            监控统计（按日计数与落盘）
 │   │   ├── service/            wecom.go（token 缓存/换取身份/mock）、sso.go（state/ticket）
 │   │   ├── store/              短时效存储接口与内存/Redis 实现
 │   │   └── middleware/         请求日志、panic 恢复、IP 限流

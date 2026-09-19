@@ -35,6 +35,7 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 
 	app, ok := h.appOf(req.App)
 	if !ok {
+		h.track("verify_app_reject")
 		h.audit.Event("verify_app_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_app")
 		return
@@ -46,11 +47,13 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 
 	if !verifySign(req, app.AppSecret) {
 		h.log.Warn("verify 签名校验失败", "app", req.App, "remote", remote)
+		h.track("verify_sign_reject")
 		h.audit.Event("verify_sign_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_sign")
 		return
 	}
 	if skew := h.now().Sub(time.Unix(req.TS, 0)).Abs(); skew > h.cfg.TTL.VerifyTSSkew {
+		h.track("verify_ts_reject")
 		h.audit.Event("verify_ts_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "expired_ts")
 		return
@@ -59,17 +62,20 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 	rec, ok := h.sso.ConsumeTicket(r.Context(), req.Ticket)
 	if !ok {
 		h.log.Warn("ticket 校验失败", "app", req.App, "remote", remote)
+		h.track("ticket_reject")
 		h.audit.Event("ticket_reject", "app", req.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_ticket")
 		return
 	}
 	if rec.App != req.App {
 		h.log.Warn("ticket 归属不匹配", "ticket_app", rec.App, "req_app", req.App, "remote", remote)
+		h.track("ticket_mismatch")
 		h.audit.Event("ticket_mismatch", "app", req.App, "ticket_app", rec.App, "remote", remote)
 		writeVerifyError(w, http.StatusUnauthorized, "invalid_ticket")
 		return
 	}
 
+	h.track("verify_ok")
 	h.audit.Event("verify_ok", "app", req.App, "userid", rec.Userid, "remote", remote)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"userid": rec.Userid,

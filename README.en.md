@@ -252,6 +252,8 @@ Same as Docker: `/healthz`, `/login?app=oa`, `/WW_verify_xxxxxxxx.txt`.
 | GET | `/login?app=oa&redirect=/path` | Business system (browser redirect) | Whitelist check → register state → 302 to WeCom |
 | GET | `/callback?code=&state=` | WeCom | Consume state → code to userid → issue ticket → 302 back |
 | POST | `/api/verify` | Business backend | Signature check → one-time ticket redemption → `{userid, name}` |
+| GET | `/status?token=` | Admin browser | Status dashboard (requires `status.enabled`) |
+| GET | `/api/status?token=` | Status page | Login/redemption stats, runtime info & storage health (token-protected) |
 | GET | `/healthz` | Probes | Returns `ok` |
 
 Verify signature (generated business-side, compared constant-time by the auth center):
@@ -278,6 +280,7 @@ whitelist or nothing: unknown app → 400, redirect limited to in-app paths
 - **Least-privilege keys** — business systems hold only their own `app_secret`, valid solely for verify signatures.
 - **Rate limiting** — `/login` 30/min/IP and `/api/verify` 120/min/IP by default, tunable in config.
 - **Audit trail** — optional dedicated JSON-lines audit file covering login starts, ticket issuance/redemption, plus failed state checks, ticket replays and signature failures (also Warn-level runtime logs).
+- **Status dashboard** — optional `/status` (token-protected): login/redemption stats, today's rejections, version & storage health, auto-refreshed every 30s; see [docs/manual.md](docs/manual.md) (Chinese), section 8.4.
 - **Restart semantics** — with in-memory storage a restart drops in-flight logins (users simply rescan); Redis-backed deployments are unaffected by a single instance restarting.
 
 ## FAQ
@@ -322,8 +325,10 @@ wecom-auth-center/
 │   ├── cmd/server/             entrypoint (config loading, graceful shutdown)
 │   ├── internal/
 │   │   ├── audit/              dedicated JSON-lines security audit log
+│   │   ├── buildinfo/          build metadata (CI ldflags injection)
 │   │   ├── config/             YAML config loading & strict validation
-│   │   ├── handler/            /login /callback /api/verify /healthz + routing
+│   │   ├── handler/            /login /callback /api/verify /status /healthz + routing
+│   │   ├── metrics/            monitoring counters (daily buckets & persistence)
 │   │   ├── service/            wecom.go (token cache/identity/mock), sso.go (state/ticket)
 │   │   ├── store/              short-lived store interface + memory/Redis implementations
 │   │   └── middleware/         request log, panic recovery, IP rate limiting
