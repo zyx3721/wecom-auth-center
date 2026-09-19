@@ -120,12 +120,15 @@ func fillSeries(snap metrics.Snapshot, now time.Time) []map[string]any {
 	series := make([]map[string]any, 0, 7)
 	for i := 6; i >= 0; i-- {
 		date := now.AddDate(0, 0, -i).Format("2006-01-02")
-		var logins, tickets int64
+		var logins, tickets, rejects int64
 		if day, ok := byDate[date]; ok {
 			logins = day.Counts["login_start"]
 			tickets = day.Counts["ticket_issue"]
+			for _, ev := range rejectEvents {
+				rejects += day.Counts[ev]
+			}
 		}
-		series = append(series, map[string]any{"date": date, "logins": logins, "tickets": tickets})
+		series = append(series, map[string]any{"date": date, "logins": logins, "tickets": tickets, "rejects": rejects})
 	}
 	return series
 }
@@ -136,6 +139,7 @@ func statusCards(snap metrics.Snapshot) map[string]int64 {
 		"logins7d":      snap.Total["login_start"],
 		"tickets7d":     snap.Total["ticket_issue"],
 		"loginsToday":   snap.Today["login_start"],
+		"ticketsToday":  snap.Today["ticket_issue"],
 		"verifyOkToday": snap.Today["verify_ok"],
 	}
 }
