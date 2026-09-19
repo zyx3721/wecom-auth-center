@@ -1,0 +1,83 @@
+# 敏感配置（corpid/secret/app_secret）
+server/config.yaml
+*.local.yaml
+
+# Go
+server/bin/
+tmp/
+*.exe
+*.test
+coverage.out
+
+# 日志
+logs/
+*.log
+
+# 运行时数据
+server/status-metrics.json
+
+# IDE / 编辑器
+.vscode/
+!.vscode/extensions.json
+.idea/
+.fleet/
+*.sw?
+
+# AI 编辑器配置
+.claude/
+.trae/
+.codebuddy/
+.cursor/
+.copilot/
+.aider*
+.codeium/
+.tabnine/
+.codex/
+.supermaven/
+.windsurf/
+.zed/
+.zcode/
+continue/
+.github/copilot/
+.codex-cache/
+.codegraph/
+.playwright-mcp/
+.playwright-cli/
+AGENTS.md
+CLAUDE.md
+
+# 文档文件
+优化.md
+requirements.txt
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+node_modules/
+bower_components/
+jspm_packages/
+__pycache__/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）
