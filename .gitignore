@@ -4,6 +4,7 @@ server/config.yaml
 
 # Go
 server/bin/
+tmp/
 *.exe
 *.test
 coverage.out
