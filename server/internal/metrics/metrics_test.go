@@ -68,6 +68,25 @@ func TestPruneToSevenDays(t *testing.T) {
 	}
 }
 
+func TestTodayFollowsCalendar(t *testing.T) {
+	m, c := newTestMetrics(t)
+
+	m.Inc("login_start")
+	c.current = c.current.Add(24 * time.Hour)
+	snap := m.Snapshot()
+	if len(snap.Today) != 0 {
+		t.Errorf("跨零点后未产生新事件，今日计数应为空: %+v", snap.Today)
+	}
+	if snap.Total["login_start"] != 1 {
+		t.Errorf("近 7 天累计不应受零点影响: %+v", snap.Total)
+	}
+
+	m.Inc("login_start")
+	if m.Snapshot().Today["login_start"] != 1 {
+		t.Errorf("新一天的今日计数不符: %+v", m.Snapshot().Today)
+	}
+}
+
 func TestSaveLoadRoundtrip(t *testing.T) {
 	m, c := newTestMetrics(t)
 	m.Inc("login_start")

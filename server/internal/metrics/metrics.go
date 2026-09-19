@@ -113,7 +113,6 @@ func (m *Metrics) Snapshot() Snapshot {
 	defer m.mu.Unlock()
 	m.pruneLocked()
 	days := make([]DayPoint, 0, len(m.days))
-	today := map[string]int64{}
 	total := map[string]int64{}
 	for _, date := range m.sortedDaysLocked() {
 		counts := map[string]int64{}
@@ -123,8 +122,9 @@ func (m *Metrics) Snapshot() Snapshot {
 		}
 		days = append(days, DayPoint{Date: date, Counts: counts})
 	}
-	if len(days) > 0 {
-		for event, n := range days[len(days)-1].Counts {
+	today := map[string]int64{}
+	if counts, ok := m.days[m.now().Format("2006-01-02")]; ok {
+		for event, n := range counts {
 			today[event] = n
 		}
 	}
