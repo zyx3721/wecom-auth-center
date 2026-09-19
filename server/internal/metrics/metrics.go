@@ -14,10 +14,23 @@ import (
 // retainedDays 统计保留的天数（含今日）
 const retainedDays = 7
 
+// recentCap 最近登录记录保留条数
+const recentCap = 50
+
+// LoginRecord 单次扫码登录成功的流水记录。
+type LoginRecord struct {
+	Time   time.Time `json:"time"`
+	App    string    `json:"app"`
+	Userid string    `json:"userid"`
+	Name   string    `json:"name,omitempty"`
+	Remote string    `json:"remote,omitempty"`
+}
+
 // Metrics 按日分桶的事件计数器，事件名与审计事件一致。
 type Metrics struct {
 	mu      sync.Mutex
 	days    map[string]map[string]int64
+	recent  []LoginRecord
 	started time.Time
 	now     func() time.Time
 }
@@ -63,6 +76,34 @@ func (m *Metrics) Inc(event string) {
 	m.days[day][event]++
 }
 
+// RecordLogin 记录一条扫码登录成功的流水，nil 接收者为空操作
+func (m *Metrics) RecordLogin(rec LoginRecord) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if rec.Time.IsZero() {
+		rec.Time = m.now()
+	}
+	m.recent = append([]LoginRecord{rec}, m.recent...)
+	if len(m.recent) > recentCap {
+		m.recent = m.recent[:recentCap]
+	}
+}
+
+// RecentLogins 返回最近的登录流水副本，新的在前，nil 接收者返回空切片
+func (m *Metrics) RecentLogins() []LoginRecord {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]LoginRecord, len(m.recent))
+	copy(out, m.recent)
+	return out
+}
+
 // Snapshot 输出逐日序列（旧→新）、今日计数与近 7 天累计，nil 接收者返回空快照
 func (m *Metrics) Snapshot() Snapshot {
 	if m == nil {
@@ -97,7 +138,7 @@ func (m *Metrics) Save(path string) error {
 	}
 	m.mu.Lock()
 	m.pruneLocked()
-	model := persistModel{UpdatedAt: m.now(), Days: m.days}
+	model := persistModel{UpdatedAt: m.now(), Days: m.days, Recent: m.recent}
 	m.mu.Unlock()
 
 	payload, err := json.Marshal(model)
@@ -141,7 +182,11 @@ func (m *Metrics) Load(path string) error {
 	if model.Days == nil {
 		model.Days = map[string]map[string]int64{}
 	}
+	if len(model.Recent) > recentCap {
+		model.Recent = model.Recent[:recentCap]
+	}
 	m.days = model.Days
+	m.recent = model.Recent
 	m.pruneLocked()
 	return nil
 }
@@ -168,4 +213,5 @@ func (m *Metrics) sortedDaysLocked() []string {
 type persistModel struct {
 	UpdatedAt time.Time                   `json:"updated_at"`
 	Days      map[string]map[string]int64 `json:"days"`
+	Recent    []LoginRecord               `json:"recent,omitempty"`
 }

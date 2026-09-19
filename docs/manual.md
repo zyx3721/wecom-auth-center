@@ -361,6 +361,8 @@ state/ticket 以 JSON 存于 `wecom-auth-center:state:*` 与 `wecom-auth-center:
 
 监控页展示：近 7 天登录发起/登录成功、今日登录发起/兑换成功 4 张统计卡，近 7 天趋势图（页面内自绘 SVG，无外部图表库），今日拒绝事件明细（state 失败/签名失败/ticket 拒绝等），版本与构建信息、运行时长、存储驱动与 Redis 在线状态，30 秒自动刷新。统计按日分桶保留 7 天，与审计事件同名同点位采集。
 
+「最近登录」面板逐条展示成功扫码登录的流水（时间、企微账号 userid、姓名、来源应用、登录发起 IP，最多保留 50 条并随统计文件持久化）。IP 为发起登录时浏览器来源地址（反代后取 `X-Real-IP`）；开启 `fetch_name` 后才有姓名。该面板含用户账号信息，请妥善保管访问令牌，必要时在 Nginx 对 `/status`、`/api/status` 追加来源限制。
+
 # 六、HTTP 接口与调试
 
 ## 6.1 接口清单
@@ -457,7 +459,7 @@ docker run ... -v /opt/wecom-auth-center/audit:/app/audit ...
 
 ## 8.4 监控页
 
-开启 `status.enabled` 并配置 `status.token` 后，浏览器访问 `https://auth域名/status?token=你的令牌` 查看运行状态：近 7 天与今日的登录发起、ticket 签发、兑换成功统计，今日拒绝事件（state 失败 / 签名失败 / ticket 拒绝），版本与构建信息、运行时长、存储驱动与 Redis 在线状态，每 30 秒自动刷新。
+开启 `status.enabled` 并配置 `status.token` 后，浏览器访问 `https://auth域名/status?token=你的令牌` 查看运行状态：近 7 天与今日的登录发起、ticket 签发、兑换成功统计，今日拒绝事件（state 失败 / 签名失败 / ticket 拒绝），最近登录流水（企微账号、姓名、来源应用与登录发起 IP），版本与构建信息、运行时长、存储驱动与 Redis 在线状态，每 30 秒自动刷新。
 
 - 数据接口为同令牌的 `/api/status?token=`，可供脚本采集；令牌错误返回 403，`status.enabled: false` 时按 404 处理；
 - 统计与审计事件同名同点位采集，按日分桶保留 7 天，每 60 秒落盘至 `status.data_path`，重启自动恢复；

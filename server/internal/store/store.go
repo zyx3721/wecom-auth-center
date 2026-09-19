@@ -12,6 +12,7 @@ import (
 type StateRecord struct {
 	App      string // 业务系统标识（白名单键）
 	Redirect string // 登录后业务系统内的相对路径，可为空
+	Remote   string // 登录发起时浏览器来源 IP，用于监控页最近登录展示
 }
 
 // TicketRecord /callback 生成 ticket 时登记的身份与去向。

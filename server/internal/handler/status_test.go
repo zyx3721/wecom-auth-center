@@ -47,6 +47,7 @@ func TestStatusAPICounters(t *testing.T) {
 
 	loginReq := httptest.NewRequest("GET", "/login?app=oa", nil)
 	h.Login(httptest.NewRecorder(), loginReq)
+	h.metrics.RecordLogin(metrics.LoginRecord{Time: time.Now(), App: "oa", Userid: "mockuser", Name: "模拟用户", Remote: "10.0.0.9"})
 
 	rec := getStatusAPI(t, h, "test-status-token-0123456789abcdef")
 	var payload struct {
@@ -57,6 +58,13 @@ func TestStatusAPICounters(t *testing.T) {
 			Logins  int64  `json:"logins"`
 			Tickets int64  `json:"tickets"`
 		} `json:"series"`
+		RecentLogins []struct {
+			Time   string `json:"time"`
+			App    string `json:"app"`
+			Userid string `json:"userid"`
+			Name   string `json:"name"`
+			Remote string `json:"remote"`
+		} `json:"recentLogins"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("响应非合法 JSON: %v", err)
@@ -73,6 +81,10 @@ func TestStatusAPICounters(t *testing.T) {
 	}
 	if payload.Server["version"] == "" || payload.Server["hostname"] == "" {
 		t.Errorf("服务信息缺失: %+v", payload.Server)
+	}
+	if len(payload.RecentLogins) != 1 || payload.RecentLogins[0].Userid != "mockuser" ||
+		payload.RecentLogins[0].Name != "模拟用户" || payload.RecentLogins[0].Remote != "10.0.0.9" {
+		t.Errorf("最近登录流水不符: %+v", payload.RecentLogins)
 	}
 }
 

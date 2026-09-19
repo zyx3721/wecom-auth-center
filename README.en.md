@@ -280,7 +280,7 @@ whitelist or nothing: unknown app → 400, redirect limited to in-app paths
 - **Least-privilege keys** — business systems hold only their own `app_secret`, valid solely for verify signatures.
 - **Rate limiting** — `/login` 30/min/IP and `/api/verify` 120/min/IP by default, tunable in config.
 - **Audit trail** — optional dedicated JSON-lines audit file covering login starts, ticket issuance/redemption, plus failed state checks, ticket replays and signature failures (also Warn-level runtime logs).
-- **Status dashboard** — optional `/status` (token-protected): login/redemption stats, today's rejections, version & storage health, auto-refreshed every 30s; see [docs/manual.md](docs/manual.md) (Chinese), section 8.4.
+- **Status dashboard** — optional `/status` (token-protected): login/redemption stats, today's rejections, a recent-logins feed (WeCom userid & source IP), version & storage health, auto-refreshed every 30s; see [docs/manual.md](docs/manual.md) (Chinese), section 8.4.
 - **Restart semantics** — with in-memory storage a restart drops in-flight logins (users simply rescan); Redis-backed deployments are unaffected by a single instance restarting.
 
 ## FAQ

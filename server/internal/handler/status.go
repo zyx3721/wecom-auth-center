@@ -88,6 +88,18 @@ func (h *Handler) statusPayload(r *http.Request) map[string]any {
 
 	series := fillSeries(snap, h.now())
 
+	recent := h.metrics.RecentLogins()
+	recentLogins := make([]map[string]any, 0, len(recent))
+	for _, rec := range recent {
+		recentLogins = append(recentLogins, map[string]any{
+			"time":   rec.Time.Format("2006-01-02 15:04:05"),
+			"app":    rec.App,
+			"userid": rec.Userid,
+			"name":   rec.Name,
+			"remote": rec.Remote,
+		})
+	}
+
 	return map[string]any{
 		"server": map[string]any{
 			"hostname":      hostname,
@@ -107,6 +119,7 @@ func (h *Handler) statusPayload(r *http.Request) map[string]any {
 		"cards":        statusCards(snap),
 		"rejectsToday": rejects,
 		"series":       series,
+		"recentLogins": recentLogins,
 		"generatedAt":  h.now().Format(time.RFC3339),
 	}
 }

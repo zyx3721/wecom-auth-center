@@ -123,6 +123,55 @@ func TestConcurrentInc(t *testing.T) {
 	}
 }
 
+func TestRecordLoginCapAndOrder(t *testing.T) {
+	m, c := newTestMetrics(t)
+
+	for i := 0; i < recentCap+5; i++ {
+		m.RecordLogin(LoginRecord{Time: c.Now(), App: "oa", Userid: "user" + itoa(i), Remote: "10.0.0." + itoa(i%255)})
+		c.current = c.current.Add(time.Second)
+	}
+	list := m.RecentLogins()
+	if len(list) != recentCap {
+		t.Fatalf("流水应保留最近 %d 条，实际 %d", recentCap, len(list))
+	}
+	if list[0].Userid != "user"+itoa(recentCap+4) {
+		t.Errorf("最新记录应在最前: %+v", list[0])
+	}
+	if list[len(list)-1].Userid != "user5" {
+		t.Errorf("最旧记录应为 user5: %+v", list[len(list)-1])
+	}
+}
+
+func TestLoginPersistRoundtrip(t *testing.T) {
+	m, _ := newTestMetrics(t)
+	m.RecordLogin(LoginRecord{Time: time.Now(), App: "oa", Userid: "zhangsan", Name: "张三", Remote: "172.18.0.9"})
+
+	path := filepath.Join(t.TempDir(), "status-metrics.json")
+	if err := m.Save(path); err != nil {
+		t.Fatalf("落盘失败: %v", err)
+	}
+	restored := New(time.Now)
+	if err := restored.Load(path); err != nil {
+		t.Fatalf("恢复失败: %v", err)
+	}
+	list := restored.RecentLogins()
+	if len(list) != 1 || list[0].Userid != "zhangsan" || list[0].Name != "张三" || list[0].Remote != "172.18.0.9" {
+		t.Fatalf("登录流水恢复不符: %+v", list)
+	}
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var b []byte
+	for n > 0 {
+		b = append([]byte{byte('0' + n%10)}, b...)
+		n /= 10
+	}
+	return string(b)
+}
+
 func TestNilReceiverSafe(t *testing.T) {
 	var m *Metrics
 	m.Inc("login_start")

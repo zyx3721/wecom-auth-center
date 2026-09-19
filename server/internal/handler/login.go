@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/jerion/wecom-auth-center/server/internal/config"
+	"github.com/jerion/wecom-auth-center/server/internal/metrics"
 	"github.com/jerion/wecom-auth-center/server/internal/middleware"
 	"github.com/jerion/wecom-auth-center/server/internal/store"
 )
@@ -18,11 +19,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirect := sanitizeLocalPath(r.URL.Query().Get("redirect"))
+	remote := middleware.RealIP(h.cfg.Server.TrustProxy)(r)
 	h.track("login_start")
-	h.audit.Event("login_start", "app", appID, "redirect", redirect,
-		"remote", middleware.RealIP(h.cfg.Server.TrustProxy)(r))
+	h.audit.Event("login_start", "app", appID, "redirect", redirect, "remote", remote)
 
-	state, err := h.sso.NewState(r.Context(), store.StateRecord{App: appID, Redirect: redirect})
+	state, err := h.sso.NewState(r.Context(), store.StateRecord{App: appID, Redirect: redirect, Remote: remote})
 	if err != nil {
 		h.log.Error("生成 state 失败", slogErr(err))
 		h.renderError(w, http.StatusInternalServerError)
@@ -107,5 +108,6 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	h.log.Info("颁发 ticket", "app", rec.App, "userid", ui.Userid)
 	h.track("ticket_issue")
 	h.audit.Event("ticket_issue", "app", rec.App, "userid", ui.Userid)
+	h.metrics.RecordLogin(metrics.LoginRecord{Time: h.now(), App: rec.App, Userid: ui.Userid, Name: ui.Name, Remote: rec.Remote})
 	http.Redirect(w, r, buildRedirectURL(app, ticket, rec.Redirect), http.StatusFound)
 }

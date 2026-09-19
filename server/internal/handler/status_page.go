@@ -85,6 +85,20 @@ const statusHTML = `<!DOCTYPE html>
   .stat.clickable:hover .stat-hint{opacity:1}
 
   .main{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:14px;min-height:0}
+  .left-col{display:flex;flex-direction:column;gap:14px;min-height:0;min-width:0}
+  .left-col > .panel{flex:1 1 0;min-height:220px}
+  .logins-panel .logins{flex:1;min-height:0;overflow:auto;padding:2px 16px 10px;display:flex;flex-direction:column}
+  .logins .detail-empty{margin:auto;padding:14px 0}
+  .login-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:center;justify-items:center;
+    padding:9px 40px;border-radius:10px;font-size:12.5px}
+  .login-row:nth-child(odd){background:rgba(31,58,110,.025)}
+  .login-row .lt{color:var(--muted2);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .login-row .lu{font-weight:700;color:#232f52;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .login-row .ln{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .login-row .la{color:var(--indigo);font-weight:700}
+  .login-row .lr{color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .panel{background:var(--card);border:1px solid var(--border);border-radius:18px;
     box-shadow:var(--shadow);backdrop-filter:blur(16px);display:flex;flex-direction:column;min-height:0;overflow:hidden}
   .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--stroke);flex-wrap:wrap}
@@ -241,6 +255,7 @@ const statusHTML = `<!DOCTYPE html>
   </section>
 
   <main class="main">
+    <div class="left-col">
     <section class="panel">
       <div class="panel-head">
         <h2>近 7 天登录趋势<span class="muted" id="mockNote"></span></h2>
@@ -255,6 +270,12 @@ const statusHTML = `<!DOCTYPE html>
         <div class="empty">暂无数据</div>
       </div>
     </section>
+
+    <section class="panel logins-panel">
+      <div class="panel-head"><h2>最近登录<span class="muted">最近 50 条 · 企微账号与登录发起 IP</span></h2><span class="muted" id="loginsCount"></span></div>
+      <div class="logins" id="logins"><div class="detail-empty">暂无登录记录</div></div>
+    </section>
+    </div>
 
     <aside class="side">
       <section class="panel">
@@ -408,6 +429,9 @@ const statusHTML = `<!DOCTYPE html>
         var p3 = pts[i + 2] || p2;
         var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
         var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+        var yLo = Math.min(p1[1], p2[1]), yHi = Math.max(p1[1], p2[1]);
+        c1y = Math.min(yHi, Math.max(yLo, c1y));
+        c2y = Math.min(yHi, Math.max(yLo, c2y));
         d += " C" + c1x + " " + c1y + " " + c2x + " " + c2y + " " + p2[0] + " " + p2[1];
       }
       return d;
@@ -547,6 +571,26 @@ const statusHTML = `<!DOCTYPE html>
     else { md.textContent = "PC 扫码"; md.className = "tag ok"; }
   }
 
+  function renderLogins(d) {
+    var box = $("logins");
+    var list = d.recentLogins || [];
+    $("loginsCount").textContent = list.length ? ("共 " + list.length + " 条") : "";
+    if (!list.length) { box.innerHTML = '<div class="detail-empty">暂无登录记录</div>'; return; }
+    box.innerHTML = "";
+    list.forEach(function (r) {
+      var row = document.createElement("div"); row.className = "login-row";
+      function cell(cls, text) {
+        var e = document.createElement("span"); e.className = cls; e.textContent = text || "-"; return e;
+      }
+      row.appendChild(cell("lt", r.time));
+      row.appendChild(cell("lu", r.userid));
+      row.appendChild(cell("ln", r.name));
+      row.appendChild(cell("la", r.app));
+      row.appendChild(cell("lr", r.remote));
+      box.appendChild(row);
+    });
+  }
+
   function apply(d) {
     lastData = d;
     chartDays = d.series || [];
@@ -566,6 +610,7 @@ const statusHTML = `<!DOCTYPE html>
     $("mockNote").textContent = d.server.mock ? "（mock 演练模式）" : "";
 
     renderTags(d);
+    renderLogins(d);
     renderService(d);
     drawChart();
     $("updated").textContent = new Date(d.generatedAt).toLocaleTimeString("zh-CN", { hour12: false });
