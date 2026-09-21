@@ -195,10 +195,35 @@ const statusPageJS = `(function () {
     window.addEventListener("resize", drawChart);
   }
 
+  var kvTip = document.createElement("div");
+  kvTip.className = "kv-tip";
+  document.body.appendChild(kvTip);
+
+  function moveKvTip(ev) {
+    var x = ev.clientX + 14, y = ev.clientY + 16;
+    var w = kvTip.offsetWidth, h = kvTip.offsetHeight;
+    if (x + w > window.innerWidth - 8) x = ev.clientX - w - 14;
+    if (y + h > window.innerHeight - 8) y = ev.clientY - h - 12;
+    if (x < 8) x = 8;
+    if (y < 8) y = 8;
+    kvTip.style.left = x + "px";
+    kvTip.style.top = y + "px";
+  }
+
   function svcItem(k, v) {
     var d = document.createElement("div"); d.className = "svc-item";
     var ks = document.createElement("span"); ks.className = "k"; ks.textContent = k;
     var vs = document.createElement("span"); vs.className = "v"; vs.textContent = v;
+    vs.addEventListener("mouseenter", function (ev) {
+      if (vs.scrollWidth <= vs.offsetWidth + 1) { return; } // 未被截断的值不提示
+      kvTip.textContent = vs.textContent;
+      kvTip.classList.add("show");
+      moveKvTip(ev);
+    });
+    vs.addEventListener("mousemove", function (ev) {
+      if (kvTip.classList.contains("show")) { moveKvTip(ev); }
+    });
+    vs.addEventListener("mouseleave", function () { kvTip.classList.remove("show"); });
     d.appendChild(ks); d.appendChild(vs); return d;
   }
 

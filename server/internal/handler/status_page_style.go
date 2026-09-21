@@ -183,6 +183,11 @@ const statusPageCSS = `  :root{
   .detail-empty{text-align:center;color:var(--muted2);font-size:13px;padding:36px 0}
   .lm-section{font-size:12px;font-weight:800;color:var(--indigo);margin:14px 2px 4px;letter-spacing:.4px}
   .lm-section:first-child{margin-top:6px}
+  .kv-tip{position:fixed;left:0;top:0;pointer-events:none;z-index:60;opacity:0;transition:opacity .12s ease;
+    background:rgba(18,25,44,.94);color:#fff;border-radius:10px;padding:8px 11px;
+    box-shadow:0 12px 30px rgba(10,18,40,.28);font-size:12px;line-height:1.55;
+    max-width:min(420px,80vw);white-space:normal;word-break:break-all;backdrop-filter:blur(4px)}
+  .kv-tip.show{opacity:1}
 
   @media (max-width:1360px){
     .main{grid-template-columns:minmax(0,1fr) 320px}
