@@ -25,14 +25,10 @@ type verifyRequest struct {
 
 // verifyResponse /api/verify 成功响应；档案字段在未开启对应开关时为零值。
 type verifyResponse struct {
-	Userid         string             `json:"userid"`
-	Name           string             `json:"name"`
-	Email          string             `json:"email"`
-	BizMail        string             `json:"biz_mail"`
-	JobNumber      string             `json:"job_number"`
-	Alias          string             `json:"alias"`
-	Departments    []store.Department `json:"departments"`
-	MainDepartment int64              `json:"main_department"`
+	Userid      string             `json:"userid"`
+	Name        string             `json:"name"`
+	JobNumber   string             `json:"job_number"`
+	Departments []store.Department `json:"departments"`
 }
 
 // Verify POST /api/verify
@@ -95,14 +91,10 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 		depts = []store.Department{}
 	}
 	writeJSON(w, http.StatusOK, verifyResponse{
-		Userid:         rec.Userid,
-		Name:           rec.Name,
-		Email:          rec.Email,
-		BizMail:        rec.BizMail,
-		JobNumber:      rec.JobNumber,
-		Alias:          rec.Alias,
-		Departments:    depts,
-		MainDepartment: rec.MainDepartment,
+		Userid:      rec.Userid,
+		Name:        rec.Name,
+		JobNumber:   rec.JobNumber,
+		Departments: depts,
 	})
 }
 

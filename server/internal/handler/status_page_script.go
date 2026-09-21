@@ -1,6 +1,6 @@
 package handler
 
-// statusPageJS 监控页前端脚本：数据拉取渲染、SVG 曲线、统计卡弹窗与最近登录成员档案弹窗
+// statusPageJS 监控页前端脚本：数据拉取渲染、SVG 曲线、统计卡弹窗与最近登录成员信息弹窗
 const statusPageJS = `(function () {
   "use strict";
 
@@ -255,7 +255,7 @@ const statusPageJS = `(function () {
     box.innerHTML = "";
     list.forEach(function (r) {
       var row = document.createElement("div"); row.className = "login-row clickable";
-      row.title = "点击查看成员档案";
+      row.title = "点击查看成员信息";
       function cell(cls, text) {
         var e = document.createElement("span"); e.className = cls; e.textContent = text || "-"; return e;
       }
@@ -398,40 +398,25 @@ const statusPageJS = `(function () {
     return svcItem(k, dash(v));
   }
 
-  function fmtDepts(list) {
-    var names = (list || []).map(function (d) {
-      return d.name ? (d.name + "（" + d.id + "）") : ("#" + d.id);
-    });
-    return names.length ? names.join("、") : "";
-  }
-
-  function fmtMain(r) {
-    var depts = r.departments || [];
-    for (var i = 0; i < depts.length; i++) {
-      if (depts[i].id === r.mainDepartment) {
-        return depts[i].name ? (depts[i].name + "（" + depts[i].id + "）") : ("#" + depts[i].id);
-      }
-    }
-    return r.mainDepartment ? ("#" + r.mainDepartment) : "";
+  function fmtDepts(r) {
+    var parts = (r.departments || []).map(function (d) { return d.name || ""; })
+      .filter(function (s) { return s; });
+    return parts.join("、");
   }
 
   function openLoginModal(r) {
-    loginModalTitle.textContent = dash(r.userid) === "-" ? "成员档案" : r.userid;
+    loginModalTitle.textContent = dash(r.userid) === "-" ? "成员信息" : r.userid;
     loginModalSub.textContent = "姓名 " + dash(r.name) + " · 来源应用 " + dash(r.app);
     loginModalBody.innerHTML = "";
     loginModalBody.appendChild(lmSection("登录信息"));
     loginModalBody.appendChild(lmRow("登录时间", r.time));
     loginModalBody.appendChild(lmRow("来源应用", r.app));
     loginModalBody.appendChild(lmRow("来源 IP", r.remote));
-    loginModalBody.appendChild(lmSection("成员档案"));
+    loginModalBody.appendChild(lmSection("成员信息"));
     loginModalBody.appendChild(lmRow("企微账号", r.userid));
     loginModalBody.appendChild(lmRow("姓名", r.name));
     loginModalBody.appendChild(lmRow("员工编码", r.jobNumber));
-    loginModalBody.appendChild(lmRow("别名 / 账号", r.alias));
-    loginModalBody.appendChild(lmRow("成员邮箱", r.email));
-    loginModalBody.appendChild(lmRow("企业邮箱", r.bizMail));
-    loginModalBody.appendChild(lmRow("所属部门", fmtDepts(r.departments)));
-    loginModalBody.appendChild(lmRow("主部门", fmtMain(r)));
+    loginModalBody.appendChild(lmRow("部门", fmtDepts(r)));
     loginModal.classList.add("open");
     loginModal.setAttribute("aria-hidden", "false");
   }

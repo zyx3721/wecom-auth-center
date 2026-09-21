@@ -212,22 +212,16 @@ func TestVerifyReturnsMockProfile(t *testing.T) {
 		t.Fatalf("verify 应 200，实际 %d body=%s", rec.Code, rec.Body)
 	}
 	var out struct {
-		Userid         string             `json:"userid"`
-		Name           string             `json:"name"`
-		Email          string             `json:"email"`
-		BizMail        string             `json:"biz_mail"`
-		JobNumber      string             `json:"job_number"`
-		Alias          string             `json:"alias"`
-		Departments    []store.Department `json:"departments"`
-		MainDepartment int64              `json:"main_department"`
+		Userid      string             `json:"userid"`
+		Name        string             `json:"name"`
+		JobNumber   string             `json:"job_number"`
+		Departments []store.Department `json:"departments"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("解析 verify 响应: %v", err)
 	}
-	wantDept := []store.Department{{ID: 2, Name: "研发部"}}
-	if out.Email != "mockuser@example.com" || out.BizMail != "mockuser@example.cn" ||
-		out.JobNumber != "10001" || out.Alias != "mockuser" ||
-		out.MainDepartment != 2 || len(out.Departments) != 1 || out.Departments[0] != wantDept[0] {
+	wantDept := []store.Department{{ID: 2, Name: "研发中心/研发部"}}
+	if out.JobNumber != "10001" || len(out.Departments) != 1 || out.Departments[0] != wantDept[0] {
 		t.Fatalf("档案字段不符: %+v", out)
 	}
 }

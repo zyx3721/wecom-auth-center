@@ -167,8 +167,8 @@ func TestLoginPersistRoundtrip(t *testing.T) {
 	m, _ := newTestMetrics(t)
 	m.RecordLogin(LoginRecord{
 		Time: time.Now(), App: "oa", Userid: "zhangsan", Name: "张三", Remote: "172.18.0.9",
-		Email: "zhangsan@example.com", BizMail: "zhangsan@example.cn", JobNumber: "10001", Alias: "zhangsan",
-		Departments: []store.Department{{ID: 2, Name: "研发部"}}, MainDepartment: 2,
+		JobNumber:   "10001",
+		Departments: []store.Department{{ID: 2, Name: "研发中心/研发部"}},
 	})
 
 	path := filepath.Join(t.TempDir(), "status-metrics.json")
@@ -184,9 +184,8 @@ func TestLoginPersistRoundtrip(t *testing.T) {
 		t.Fatalf("登录流水恢复不符: %+v", list)
 	}
 	rec := list[0]
-	if rec.Email != "zhangsan@example.com" || rec.BizMail != "zhangsan@example.cn" || rec.JobNumber != "10001" ||
-		rec.Alias != "zhangsan" || rec.MainDepartment != 2 ||
-		len(rec.Departments) != 1 || rec.Departments[0].Name != "研发部" {
+	if rec.JobNumber != "10001" ||
+		len(rec.Departments) != 1 || rec.Departments[0].Name != "研发中心/研发部" {
 		t.Fatalf("登录流水档案字段恢复不符: %+v", rec)
 	}
 }

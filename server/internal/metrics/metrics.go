@@ -21,17 +21,13 @@ const recentCap = 50
 
 // LoginRecord 单次扫码登录成功的流水记录。档案字段在未开启 fetch_profile 时为零值。
 type LoginRecord struct {
-	Time           time.Time          `json:"time"`
-	App            string             `json:"app"`
-	Userid         string             `json:"userid"`
-	Name           string             `json:"name,omitempty"`
-	Remote         string             `json:"remote,omitempty"`
-	Email          string             `json:"email,omitempty"`
-	BizMail        string             `json:"biz_mail,omitempty"`
-	JobNumber      string             `json:"job_number,omitempty"`
-	Alias          string             `json:"alias,omitempty"`
-	Departments    []store.Department `json:"departments,omitempty"`
-	MainDepartment int64              `json:"main_department,omitempty"`
+	Time        time.Time          `json:"time"`
+	App         string             `json:"app"`
+	Userid      string             `json:"userid"`
+	Name        string             `json:"name,omitempty"`
+	Remote      string             `json:"remote,omitempty"`
+	JobNumber   string             `json:"job_number,omitempty"`
+	Departments []store.Department `json:"departments,omitempty"`
 }
 
 // Metrics 按日分桶的事件计数器，事件名与审计事件一致。

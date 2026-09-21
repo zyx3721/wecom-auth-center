@@ -1,7 +1,7 @@
 package handler
 
 // statusHTML 监控页单文件前端：全视口 KMS 风格仪表盘，自绘 SVG 平滑曲线 + 悬停提示 + 统计卡弹窗明细 +
-// 最近登录行点击弹窗查看成员档案，30 秒自动刷新。样式与脚本分别在 status_page_style.go 与 status_page_script.go。
+// 最近登录行点击弹窗查看成员信息，30 秒自动刷新。样式与脚本分别在 status_page_style.go 与 status_page_script.go。
 const statusHTML = statusPageHead + statusPageCSS + statusPageMid + statusPageJS + statusPageTail
 
 // statusPageHead 页面 DOCTYPE、元信息与样式标签开头
@@ -85,7 +85,7 @@ const statusPageMid = `
     </section>
 
     <section class="panel logins-panel">
-      <div class="panel-head"><h2>最近登录<span class="muted">最近 50 条 · 点击行查看成员档案</span></h2><span class="muted" id="loginsCount"></span></div>
+      <div class="panel-head"><h2>最近登录<span class="muted">最近 50 条 · 点击行查看成员信息</span></h2><span class="muted" id="loginsCount"></span></div>
       <div class="logins" id="logins"><div class="detail-empty">暂无登录记录</div></div>
     </section>
     </div>
@@ -143,7 +143,7 @@ const statusPageMid = `
   <div class="modal-card narrow" role="dialog" aria-modal="true">
     <div class="modal-head">
       <div>
-        <h3 id="loginModalTitle">成员档案</h3>
+        <h3 id="loginModalTitle">成员信息</h3>
         <p id="loginModalSub">-</p>
       </div>
       <button class="modal-close" id="loginModalClose" type="button" aria-label="关闭">×</button>

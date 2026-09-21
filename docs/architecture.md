@@ -68,7 +68,7 @@ https://login.work.weixin.qq.com/wwlogin/sso/login
 2. 用 `code` 换取身份：
    - `GET https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=&corpsecret=` → `access_token`（缓存 7200s，提前 5 分钟刷新，加锁防并发击穿）；
    - `GET https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token=&code=` → `userid`；
-   - 开启 `fetch_name` / `fetch_profile` 时额外调用通讯录 `user/get` 补全姓名或档案（部门/邮箱/员工编码/别名）。`fetch_profile` 优先使用通讯录 Secret 的独立 token（可返回邮箱等敏感字段），部门 ID 经 `department/get` 换算名称（进程内缓存 10 分钟）；档案取不到时静默降级，不阻断登录。
+   - 开启 `fetch_name` / `fetch_profile` 时额外调用通讯录 `user/get` 补全姓名或档案（部门/员工编码）。部门经 `department/get` 沿 `parentid` 向上追溯换算完整层级路径（不含根部门，进程内缓存 10 分钟）；档案获取失败时记录 Warn 并降级为空值，不阻断登录。成员邮箱/企业邮箱受企微平台限制，扫码链路不返回。
 3. 生成一次性 `ticket`，保存 `ticket → {app, redirect, userid, 可选档案字段}`，TTL 60s。
 4. 302 到白名单中该 app 的回调地址：`https://oa.example.com/sso/login?ticket=xxx&redirect=/dashboard`。
 
@@ -103,16 +103,12 @@ sign = hex( HMAC-SHA256( key = app_secret, message = app + "\n" + ticket + "\n" 
 {
   "userid": "zhangsan",
   "name": "张三",
-  "email": "",
-  "biz_mail": "zhangsan@company.cn",
   "job_number": "10001",
-  "alias": "zhangsan",
-  "departments": [{ "id": 2, "name": "研发部" }],
-  "main_department": 2
+  "departments": [{ "id": 2, "name": "研发中心/研发部" }]
 }
 ```
 
-档案字段在未开启 `fetch_profile` 时为零值（`departments` 为空数组），响应形状恒定，业务系统可统一解析。
+档案字段在未开启 `fetch_profile` 时为零值（`departments` 为空数组），响应形状恒定，业务系统可统一解析。成员邮箱/企业邮箱受企微平台限制，扫码链路不返回。
 
 每个业务系统在认证中心配置文件中登记 `app` 标识、回调域名和独立的 `app_secret`（仅用于 verify 签名，与企业微信 secret 无关）。
 
@@ -137,7 +133,7 @@ type Store interface {
 
 - `MemoryStore`（默认）：`map` + 互斥锁 + 过期惰性清理，单实例部署。
 - `RedisStore`（`store.driver: redis`）：`SET key val EX ttl` + `GETDEL` 原子取出（要求 Redis 6.2+），多实例共享；键名 `wecom-auth-center:state:*` / `wecom-auth-center:ticket:*`，值为记录 JSON；读取故障按凭证不存在处理（fail closed），启动时 Ping 快速失败。
-- 监控统计 `internal/metrics`：与审计事件同名同点位埋点，按日分桶计数保留 7 天，每 60 秒原子落盘至 `status.data_path`（启动时加载），经 `/api/status` 输出供监控页展示；最近登录流水随 `fetch_profile` 附带成员档案字段，供监控页行点击弹窗展示。
+- 监控统计 `internal/metrics`：与审计事件同名同点位埋点，按日分桶计数保留 7 天，每 60 秒原子落盘至 `status.data_path`（启动时加载），经 `/api/status` 输出供监控页展示；最近登录流水随 `fetch_profile` 附带成员信息字段，供监控页行点击弹窗展示。
 
 `access_token` 缓存随实例内存即可；引入多实例后亦无需共享（各自获取不会互相挤掉，企业微信 token 有效期内重复获取返回相同值）。
 

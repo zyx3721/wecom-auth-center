@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// fakeWecom 模拟企微接口，记录全部请求 URI 供断言 token 归属。
+// fakeWecom 模拟企微接口，记录全部请求 URI 供断言。
 type fakeWecom struct {
 	mu          sync.Mutex
 	requests    []string
@@ -31,23 +31,26 @@ func (f *fakeWecom) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch r.URL.Path {
 	case "/cgi-bin/gettoken":
-		fmt.Fprintf(w, `{"errcode":0,"access_token":"tok-%s","expires_in":7200}`, r.URL.Query().Get("corpsecret"))
+		fmt.Fprint(w, `{"errcode":0,"access_token":"tok-appsecret","expires_in":7200}`)
 	case "/cgi-bin/auth/getuserinfo":
 		fmt.Fprint(w, `{"errcode":0,"userid":"zhangsan"}`)
 	case "/cgi-bin/user/get":
 		if failUserGet {
-			fmt.Fprint(w, `{"errcode":60011,"errmsg":"no privilege"}`)
+			fmt.Fprint(w, `{"errcode":48009,"errmsg":"api forbidden for contact assistant"}`)
 			return
 		}
-		fmt.Fprint(w, `{"errcode":0,"name":"张三","email":"","biz_mail":"zhangsan@company.cn","alias":"zhangsan",`+
+		fmt.Fprint(w, `{"errcode":0,"name":"张三",`+
 			`"department":[2,3],"main_department":2,`+
 			`"extattr":{"attrs":[{"name":"员工编码","value":"10001"},{"name":"职级","value":"P7"}]}}`)
 	case "/cgi-bin/department/get":
-		if r.URL.Query().Get("id") == "3" {
+		switch r.URL.Query().Get("id") {
+		case "2":
+			fmt.Fprint(w, `{"errcode":0,"department":{"id":2,"name":"研发部","parentid":10}}`)
+		case "10":
+			fmt.Fprint(w, `{"errcode":0,"department":{"id":10,"name":"研发中心","parentid":1}}`)
+		default: // 其余部门：应用可见范围外
 			fmt.Fprint(w, `{"errcode":60003,"errmsg":"不在可见范围"}`)
-			return
 		}
-		fmt.Fprintf(w, `{"errcode":0,"department":{"id":%s,"name":"研发部"}}`, r.URL.Query().Get("id"))
 	default:
 		http.NotFound(w, r)
 	}
@@ -73,44 +76,34 @@ func newProfileClient(t *testing.T, mutate func(*ClientOptions)) (*RealClient, *
 }
 
 func TestGetUserInfoProfile(t *testing.T) {
-	c, fake := newProfileClient(t, func(o *ClientOptions) {
-		o.FetchProfile = true
-		o.ContactSecret = "contactsecret"
-	})
+	c, fake := newProfileClient(t, func(o *ClientOptions) { o.FetchProfile = true })
 	ui, err := c.GetUserInfo(context.Background(), "code")
 	if err != nil {
 		t.Fatalf("GetUserInfo 不应报错: %v", err)
 	}
-	if ui.Name != "张三" || ui.BizMail != "zhangsan@company.cn" || ui.Alias != "zhangsan" ||
-		ui.JobNumber != "10001" || ui.MainDepartment != 2 {
+	if ui.Name != "张三" || ui.JobNumber != "10001" {
 		t.Fatalf("档案字段不符: %+v", ui)
 	}
-	if len(ui.Departments) != 2 || ui.Departments[0].Name != "研发部" || ui.Departments[1].Name != "" {
-		t.Fatalf("部门及名称解析不符: %+v", ui.Departments)
+	if len(ui.Departments) != 2 || ui.Departments[0].Name != "研发中心/研发部" || ui.Departments[1].Name != "" {
+		t.Fatalf("部门完整路径解析不符: %+v", ui.Departments)
 	}
 
 	uris := strings.Join(fake.uriList(), "\n")
-	if !strings.Contains(uris, "corpsecret=contactsecret") {
-		t.Fatalf("档案接口应使用通讯录 Secret 换取 token: %s", uris)
-	}
-	if !strings.Contains(uris, "user/get?access_token=tok-contactsecret") {
-		t.Fatalf("user/get 应携带通讯录 token: %s", uris)
+	if !strings.Contains(uris, "user/get?access_token=tok-appsecret") {
+		t.Fatalf("user/get 应使用应用 token: %s", uris)
 	}
 	if !strings.Contains(uris, "department/get?access_token=tok-appsecret") {
-		t.Fatalf("部门名称换算应使用应用 token: %s", uris)
+		t.Fatalf("部门路径换算应使用应用 token: %s", uris)
 	}
 }
 
 func TestGetUserInfoFetchNameOnly(t *testing.T) {
-	c, fake := newProfileClient(t, func(o *ClientOptions) {
-		o.FetchName = true
-		o.ContactSecret = "contactsecret"
-	})
+	c, fake := newProfileClient(t, func(o *ClientOptions) { o.FetchName = true })
 	ui, err := c.GetUserInfo(context.Background(), "code")
 	if err != nil {
 		t.Fatalf("GetUserInfo 不应报错: %v", err)
 	}
-	if ui.Name != "张三" || ui.Email != "" || ui.BizMail != "" || ui.JobNumber != "" || ui.Departments != nil {
+	if ui.Name != "张三" || ui.JobNumber != "" || ui.Departments != nil {
 		t.Fatalf("仅取姓名时不应填充档案字段: %+v", ui)
 	}
 	if strings.Contains(strings.Join(fake.uriList(), "\n"), "department/get") {
@@ -120,7 +113,7 @@ func TestGetUserInfoFetchNameOnly(t *testing.T) {
 
 func TestGetUserInfoProfileDegradesOnError(t *testing.T) {
 	c, fake := newProfileClient(t, func(o *ClientOptions) { o.FetchProfile = true })
-	fake.failUserGet = true // 档案请求失败应静默降级，不影响登录
+	fake.failUserGet = true // 档案请求失败应记 Warn 并降级，不影响登录
 	ui, err := c.GetUserInfo(context.Background(), "code")
 	if err != nil {
 		t.Fatalf("档案失败不应阻断登录: %v", err)
@@ -130,7 +123,7 @@ func TestGetUserInfoProfileDegradesOnError(t *testing.T) {
 	}
 }
 
-func TestDepartmentNameCache(t *testing.T) {
+func TestDepartmentPathCache(t *testing.T) {
 	c, fake := newProfileClient(t, func(o *ClientOptions) { o.FetchProfile = true })
 	if _, err := c.GetUserInfo(context.Background(), "code"); err != nil {
 		t.Fatalf("GetUserInfo: %v", err)
@@ -141,8 +134,8 @@ func TestDepartmentNameCache(t *testing.T) {
 			deptCalls++
 		}
 	}
-	if deptCalls != 2 { // 部门 2 与 3 各一次（3 无权限返回空名同样入缓存）
-		t.Fatalf("首轮应为两个部门各请求一次，实际 %d", deptCalls)
+	if deptCalls != 3 { // 部门 2 的路径需查 2 与 10；部门 3 可见范围外查 1 次，均入缓存
+		t.Fatalf("首轮应共请求 3 次部门接口，实际 %d", deptCalls)
 	}
 	if _, err := c.GetUserInfo(context.Background(), "code"); err != nil {
 		t.Fatalf("GetUserInfo: %v", err)

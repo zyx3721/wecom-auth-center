@@ -251,7 +251,7 @@ Same as Docker: `/healthz`, `/login?app=oa`, `/WW_verify_xxxxxxxx.txt`.
 | --- | --- | --- | --- |
 | GET | `/login?app=oa&redirect=/path` | Business system (browser redirect) | Whitelist check → register state → 302 to WeCom |
 | GET | `/callback?code=&state=` | WeCom | Consume state → code to userid → issue ticket → 302 back |
-| POST | `/api/verify` | Business backend | Signature check → one-time ticket redemption → `{userid, name}` plus profile fields (with `fetch_profile` enabled: business email, departments, job number, etc.) |
+| POST | `/api/verify` | Business backend | Signature check → one-time ticket redemption → `{userid, name}` plus profile fields (with `fetch_profile` enabled: departments, job number, etc.) |
 | GET | `/status?token=` | Admin browser | Status dashboard (requires `status.enabled`) |
 | GET | `/api/status?token=` | Status page | Login/redemption stats, runtime info & storage health (token-protected) |
 | GET | `/healthz` | Probes | Returns `ok` |

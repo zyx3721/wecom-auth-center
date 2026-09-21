@@ -49,8 +49,8 @@ func TestStatusAPICounters(t *testing.T) {
 	h.Login(httptest.NewRecorder(), loginReq)
 	h.metrics.RecordLogin(metrics.LoginRecord{
 		Time: time.Now(), App: "oa", Userid: "mockuser", Name: "模拟用户", Remote: "10.0.0.9",
-		Email: "mockuser@example.com", BizMail: "mockuser@example.cn", JobNumber: "10001", Alias: "mockuser",
-		Departments: []store.Department{{ID: 2, Name: "研发部"}}, MainDepartment: 2,
+		JobNumber:   "10001",
+		Departments: []store.Department{{ID: 2, Name: "研发中心/研发部"}},
 	})
 
 	rec := getStatusAPI(t, h, "test-status-token-0123456789abcdef")
@@ -63,17 +63,13 @@ func TestStatusAPICounters(t *testing.T) {
 			Tickets int64  `json:"tickets"`
 		} `json:"series"`
 		RecentLogins []struct {
-			Time           string             `json:"time"`
-			App            string             `json:"app"`
-			Userid         string             `json:"userid"`
-			Name           string             `json:"name"`
-			Remote         string             `json:"remote"`
-			Email          string             `json:"email"`
-			BizMail        string             `json:"bizMail"`
-			JobNumber      string             `json:"jobNumber"`
-			Alias          string             `json:"alias"`
-			Departments    []store.Department `json:"departments"`
-			MainDepartment int64              `json:"mainDepartment"`
+			Time        string             `json:"time"`
+			App         string             `json:"app"`
+			Userid      string             `json:"userid"`
+			Name        string             `json:"name"`
+			Remote      string             `json:"remote"`
+			JobNumber   string             `json:"jobNumber"`
+			Departments []store.Department `json:"departments"`
 		} `json:"recentLogins"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
@@ -97,9 +93,7 @@ func TestStatusAPICounters(t *testing.T) {
 		t.Errorf("最近登录流水不符: %+v", payload.RecentLogins)
 	}
 	r := payload.RecentLogins[0]
-	if r.Email != "mockuser@example.com" || r.BizMail != "mockuser@example.cn" || r.JobNumber != "10001" ||
-		r.Alias != "mockuser" || r.MainDepartment != 2 ||
-		len(r.Departments) != 1 || r.Departments[0].Name != "研发部" {
+	if r.JobNumber != "10001" || len(r.Departments) != 1 || r.Departments[0].Name != "研发中心/研发部" {
 		t.Errorf("最近登录流水档案字段不符: %+v", r)
 	}
 }
@@ -111,13 +105,9 @@ func TestStatusRecentLoginCarriesProfile(t *testing.T) {
 	rec := getStatusAPI(t, h, "test-status-token-0123456789abcdef")
 	var payload struct {
 		RecentLogins []struct {
-			Userid         string             `json:"userid"`
-			Email          string             `json:"email"`
-			BizMail        string             `json:"bizMail"`
-			JobNumber      string             `json:"jobNumber"`
-			Alias          string             `json:"alias"`
-			Departments    []store.Department `json:"departments"`
-			MainDepartment int64              `json:"mainDepartment"`
+			Userid      string             `json:"userid"`
+			JobNumber   string             `json:"jobNumber"`
+			Departments []store.Department `json:"departments"`
 		} `json:"recentLogins"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
@@ -127,9 +117,8 @@ func TestStatusRecentLoginCarriesProfile(t *testing.T) {
 		t.Fatalf("应有 1 条流水，实际 %d", len(payload.RecentLogins))
 	}
 	r := payload.RecentLogins[0]
-	if r.Userid != "mockuser" || r.Email != "mockuser@example.com" || r.BizMail != "mockuser@example.cn" ||
-		r.JobNumber != "10001" || r.Alias != "mockuser" || r.MainDepartment != 2 ||
-		len(r.Departments) != 1 || r.Departments[0].Name != "研发部" {
+	if r.Userid != "mockuser" || r.JobNumber != "10001" ||
+		len(r.Departments) != 1 || r.Departments[0].Name != "研发中心/研发部" {
 		t.Fatalf("流水档案字段不符: %+v", r)
 	}
 }

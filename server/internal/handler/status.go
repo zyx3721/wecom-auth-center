@@ -96,17 +96,13 @@ func (h *Handler) statusPayload(r *http.Request) map[string]any {
 			depts = []store.Department{}
 		}
 		recentLogins = append(recentLogins, map[string]any{
-			"time":           rec.Time.Format("2006-01-02 15:04:05"),
-			"app":            rec.App,
-			"userid":         rec.Userid,
-			"name":           rec.Name,
-			"remote":         rec.Remote,
-			"email":          rec.Email,
-			"bizMail":        rec.BizMail,
-			"jobNumber":      rec.JobNumber,
-			"alias":          rec.Alias,
-			"departments":    depts,
-			"mainDepartment": rec.MainDepartment,
+			"time":        rec.Time.Format("2006-01-02 15:04:05"),
+			"app":         rec.App,
+			"userid":      rec.Userid,
+			"name":        rec.Name,
+			"remote":      rec.Remote,
+			"jobNumber":   rec.JobNumber,
+			"departments": depts,
 		})
 	}
 

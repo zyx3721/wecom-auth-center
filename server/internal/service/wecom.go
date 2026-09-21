@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,14 +17,10 @@ import (
 
 // UserInfo 企业微信换取到的用户身份。档案字段在未开启 fetch_profile 时均为零值。
 type UserInfo struct {
-	Userid         string
-	Name           string // 可为空（未开启 fetch_name 时）
-	Email          string // 成员邮箱，可为空
-	BizMail        string // 企业邮箱，可为空
-	JobNumber      string // 员工编码，取自扩展属性，可为空
-	Alias          string // 成员别名（企微后台「账号」字段），可为空
-	Departments    []store.Department
-	MainDepartment int64
+	Userid      string
+	Name        string             // 可为空（未开启 fetch_name 时）
+	JobNumber   string             // 员工编码，取自扩展属性，可为空
+	Departments []store.Department // Name 为完整层级路径，可为空（应用可见范围外）
 }
 
 // WeCom 企业微信身份接口抽象，真实实现与 mock 实现均满足此接口。
@@ -32,18 +30,21 @@ type WeCom interface {
 
 const qyapiBase = "https://qyapi.weixin.qq.com"
 
-// deptNameTTL 部门名称进程内缓存时长，过期后重新查询以跟进部门改名。
+// deptNameTTL 部门信息进程内缓存时长，过期后重新查询以跟进部门调整。
 const deptNameTTL = 10 * time.Minute
+
+// maxDeptDepth 部门路径向上追溯的最大层数，防御异常数据成环。
+const maxDeptDepth = 20
 
 // ClientOptions RealClient 的构造参数。
 type ClientOptions struct {
 	CorpID         string
 	AgentID        int
-	Secret         string // 自建应用 Secret，用于 gettoken 与 getuserinfo
-	ContactSecret  string // 通讯录 Secret（可选）：配置后档案接口可返回邮箱等敏感字段
-	FetchName      bool   // 登录时额外调用通讯录接口取姓名
-	FetchProfile   bool   // 登录时额外获取成员档案（部门/邮箱/员工编码等，含姓名）
-	JobNumberField string // 员工编码取自扩展属性的字段名，为空时默认「员工编码」
+	Secret         string       // 自建应用 Secret，用于 gettoken 与 getuserinfo
+	FetchName      bool         // 登录时额外调用通讯录接口取姓名
+	FetchProfile   bool         // 登录时额外获取成员信息（部门/员工编码等，含姓名）
+	JobNumberField string       // 员工编码取自扩展属性的字段名，为空时默认「员工编码」
+	Log            *slog.Logger // 可选：档案获取失败等事件的告警日志，为 nil 时不输出
 }
 
 // RealClient 企业微信真实实现：gettoken 缓存 + getuserinfo（可选 user/get 补全姓名或档案）。
@@ -53,27 +54,31 @@ type RealClient struct {
 	Secret         string
 	FetchName      bool
 	FetchProfile   bool
-	ContactSecret  string
 	JobNumberField string
+	Log            *slog.Logger
 	// Base 便于测试替换；生产为 qyapiBase
 	Base string
 
 	httpc *http.Client
 
-	mu            sync.Mutex
-	accessToken   string
-	tokenExpiry   time.Time
-	contactToken  string
-	contactExpiry time.Time
+	mu          sync.Mutex
+	accessToken string
+	tokenExpiry time.Time
 
 	deptMu   sync.Mutex
-	deptName map[int64]deptNameCache
+	deptInfo map[int64]deptCacheEntry
 	// Now 便于测试 token 刷新逻辑
 	Now func() time.Time
 }
 
-type deptNameCache struct {
-	name      string
+// deptInfo 单个部门的名称与父部门 ID
+type deptInfo struct {
+	name     string
+	parentID int64
+}
+
+type deptCacheEntry struct {
+	info      deptInfo
 	fetchedAt time.Time
 }
 
@@ -87,12 +92,19 @@ func NewRealClient(o ClientOptions) *RealClient {
 		Secret:         o.Secret,
 		FetchName:      o.FetchName,
 		FetchProfile:   o.FetchProfile,
-		ContactSecret:  o.ContactSecret,
 		JobNumberField: o.JobNumberField,
+		Log:            o.Log,
 		Base:           qyapiBase,
 		httpc:          &http.Client{Timeout: 10 * time.Second},
-		deptName:       make(map[int64]deptNameCache),
+		deptInfo:       make(map[int64]deptCacheEntry),
 		Now:            time.Now,
+	}
+}
+
+// warn 输出档案获取的降级告警，未注入 logger 时为空操作
+func (c *RealClient) warn(msg string, args ...any) {
+	if c.Log != nil {
+		c.Log.Warn(msg, args...)
 	}
 }
 
@@ -146,45 +158,41 @@ func (c *RealClient) fetchName(ctx context.Context, token, userid string) (strin
 	return resp.Name, nil
 }
 
-// fetchProfile 调用通讯录成员详情接口补全档案；任何失败都静默降级为空字段。
+// userDetail 通讯录读取成员接口的响应体
+type userDetail struct {
+	Errcode    int     `json:"errcode"`
+	Errmsg     string  `json:"errmsg"`
+	Name       string  `json:"name"`
+	Department []int64 `json:"department"`
+	ExtAttr    struct {
+		Attrs []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"attrs"`
+	} `json:"extattr"`
+}
+
+// fetchProfile 调用通讯录成员详情接口补全档案；失败时记 Warn 并降级为空，不阻断登录。
 func (c *RealClient) fetchProfile(ctx context.Context, ui *UserInfo) {
-	token, err := c.profileToken(ctx)
+	token, err := c.token(ctx)
 	if err != nil {
+		c.warn("应用 Secret 换取 token 失败，档案降级为空", "error", err)
 		return
 	}
-	var resp struct {
-		Errcode        int     `json:"errcode"`
-		Errmsg         string  `json:"errmsg"`
-		Name           string  `json:"name"`
-		Email          string  `json:"email"`
-		BizMail        string  `json:"biz_mail"`
-		Alias          string  `json:"alias"`
-		Department     []int64 `json:"department"`
-		MainDepartment int64   `json:"main_department"`
-		ExtAttr        struct {
-			Attrs []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"attrs"`
-		} `json:"extattr"`
-	}
-	if err := c.getJSON(ctx,
-		fmt.Sprintf("%s/cgi-bin/user/get?access_token=%s&userid=%s",
-			c.Base, url.QueryEscape(token), url.QueryEscape(ui.Userid)), &resp); err != nil {
+	detail, err := c.userDetail(ctx, token, ui.Userid)
+	if err != nil {
+		c.warn("获取成员信息请求失败", "error", err)
 		return
 	}
-	if resp.Errcode != 0 {
+	if detail.Errcode != 0 {
+		c.warn("获取成员信息被企微拒绝", "errcode", detail.Errcode, "errmsg", detail.Errmsg)
 		return
 	}
-	ui.Name = resp.Name
-	ui.Email = resp.Email
-	ui.BizMail = resp.BizMail
-	ui.Alias = resp.Alias
-	ui.MainDepartment = resp.MainDepartment
-	for _, id := range resp.Department {
-		ui.Departments = append(ui.Departments, store.Department{ID: id, Name: c.departmentName(ctx, id)})
+	ui.Name = detail.Name
+	for _, id := range detail.Department {
+		ui.Departments = append(ui.Departments, store.Department{ID: id, Name: c.departmentPath(ctx, id)})
 	}
-	for _, attr := range resp.ExtAttr.Attrs {
+	for _, attr := range detail.ExtAttr.Attrs {
 		if attr.Name == c.JobNumberField {
 			ui.JobNumber = attr.Value
 			break
@@ -192,61 +200,72 @@ func (c *RealClient) fetchProfile(ctx context.Context, ui *UserInfo) {
 	}
 }
 
-// departmentName 换算部门名称，带进程内缓存；应用可见范围外的部门返回空名。
-func (c *RealClient) departmentName(ctx context.Context, id int64) string {
+// userDetail 用指定 token 调用读取成员接口
+func (c *RealClient) userDetail(ctx context.Context, token, userid string) (userDetail, error) {
+	var resp userDetail
+	err := c.getJSON(ctx,
+		fmt.Sprintf("%s/cgi-bin/user/get?access_token=%s&userid=%s",
+			c.Base, url.QueryEscape(token), url.QueryEscape(userid)), &resp)
+	return resp, err
+}
+
+// departmentPath 沿 parentid 向上追溯拼出完整部门路径（不含根部门），如「研发中心/研发部」。
+// 追溯中查不到名称（如应用可见范围外）时止于能查到的部分。
+func (c *RealClient) departmentPath(ctx context.Context, id int64) string {
+	var parts []string
+	seen := make(map[int64]bool)
+	cur := id
+	for cur != 0 && cur != 1 && !seen[cur] && len(parts) < maxDeptDepth {
+		seen[cur] = true
+		info := c.departmentInfo(ctx, cur)
+		if info.name == "" {
+			break
+		}
+		parts = append([]string{info.name}, parts...)
+		cur = info.parentID
+	}
+	return strings.Join(parts, "/")
+}
+
+// departmentInfo 查询部门名称与父部门 ID，带进程内缓存；可见范围外的部门返回零值并同样入缓存。
+func (c *RealClient) departmentInfo(ctx context.Context, id int64) deptInfo {
 	c.deptMu.Lock()
-	if ent, ok := c.deptName[id]; ok && c.Now().Sub(ent.fetchedAt) < deptNameTTL {
+	if ent, ok := c.deptInfo[id]; ok && c.Now().Sub(ent.fetchedAt) < deptNameTTL {
 		c.deptMu.Unlock()
-		return ent.name
+		return ent.info
 	}
 	c.deptMu.Unlock()
 
-	name := c.lookupDepartmentName(ctx, id)
+	info := c.lookupDepartmentInfo(ctx, id)
 	c.deptMu.Lock()
-	c.deptName[id] = deptNameCache{name: name, fetchedAt: c.Now()}
+	c.deptInfo[id] = deptCacheEntry{info: info, fetchedAt: c.Now()}
 	c.deptMu.Unlock()
-	return name
+	return info
 }
 
-func (c *RealClient) lookupDepartmentName(ctx context.Context, id int64) string {
+func (c *RealClient) lookupDepartmentInfo(ctx context.Context, id int64) deptInfo {
 	token, err := c.token(ctx)
 	if err != nil {
-		return ""
+		return deptInfo{}
 	}
 	var resp struct {
 		Errcode    int    `json:"errcode"`
 		Errmsg     string `json:"errmsg"`
 		Department struct {
-			Name string `json:"name"`
+			Name     string `json:"name"`
+			ParentID int64  `json:"parentid"`
 		} `json:"department"`
 	}
 	if err := c.getJSON(ctx,
 		fmt.Sprintf("%s/cgi-bin/department/get?access_token=%s&id=%d",
 			c.Base, url.QueryEscape(token), id), &resp); err != nil {
-		return ""
+		return deptInfo{}
 	}
 	if resp.Errcode != 0 {
-		return ""
+		c.warn("部门信息查询失败", "department_id", id, "errcode", resp.Errcode, "errmsg", resp.Errmsg)
+		return deptInfo{}
 	}
-	return resp.Department.Name
-}
-
-// profileToken 档案接口优先使用通讯录 Secret 的 token（可返回邮箱等敏感字段），未配置时退回应用 token。
-func (c *RealClient) profileToken(ctx context.Context) (string, error) {
-	if c.ContactSecret == "" {
-		return c.token(ctx)
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.contactToken != "" && c.Now().Before(c.contactExpiry) {
-		return c.contactToken, nil
-	}
-	tok, expiry, err := c.requestToken(ctx, c.ContactSecret)
-	if err != nil {
-		return "", err
-	}
-	c.contactToken, c.contactExpiry = tok, expiry
-	return tok, nil
+	return deptInfo{name: resp.Department.Name, parentID: resp.Department.ParentID}
 }
 
 // token 返回缓存的 access_token；到期前 5 分钟主动刷新，并发调用仅触发一次请求。
@@ -310,13 +329,9 @@ type MockClient struct{}
 
 func (MockClient) GetUserInfo(_ context.Context, _ string) (*UserInfo, error) {
 	return &UserInfo{
-		Userid:         "mockuser",
-		Name:           "模拟用户",
-		Email:          "mockuser@example.com",
-		BizMail:        "mockuser@example.cn",
-		JobNumber:      "10001",
-		Alias:          "mockuser",
-		Departments:    []store.Department{{ID: 2, Name: "研发部"}},
-		MainDepartment: 2,
+		Userid:      "mockuser",
+		Name:        "模拟用户",
+		JobNumber:   "10001",
+		Departments: []store.Department{{ID: 2, Name: "研发中心/研发部"}},
 	}, nil
 }
