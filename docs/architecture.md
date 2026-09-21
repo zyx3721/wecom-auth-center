@@ -68,7 +68,7 @@ https://login.work.weixin.qq.com/wwlogin/sso/login
 2. 用 `code` 换取身份：
    - `GET https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=&corpsecret=` → `access_token`（缓存 7200s，提前 5 分钟刷新，加锁防并发击穿）；
    - `GET https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token=&code=` → `userid`；
-   - 开启 `fetch_name` / `fetch_profile` 时额外调用通讯录 `user/get` 补全姓名或档案（部门/员工编码）。部门经 `department/get` 沿 `parentid` 向上追溯换算完整层级路径（不含根部门，进程内缓存 10 分钟）；档案获取失败时记录 Warn 并降级为空值，不阻断登录。成员邮箱/企业邮箱受企微平台限制，扫码链路不返回。
+   - 开启 `fetch_name` / `fetch_profile` 时额外调用通讯录 `user/get` 补全姓名或信息（部门/员工编码）。部门经 `department/get` 沿 `parentid` 向上追溯换算完整层级路径（不含根部门，进程内缓存 10 分钟；上级不在应用可见范围内时止于能查到的部分）；获取失败时记录 Warn 并降级为空值，不阻断登录。成员邮箱/企业邮箱受企微平台限制，扫码链路不返回。
 3. 生成一次性 `ticket`，保存 `ticket → {app, redirect, userid, 可选档案字段}`，TTL 60s。
 4. 302 到白名单中该 app 的回调地址：`https://oa.example.com/sso/login?ticket=xxx&redirect=/dashboard`。
 
