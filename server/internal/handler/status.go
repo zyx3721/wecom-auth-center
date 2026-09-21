@@ -91,12 +91,22 @@ func (h *Handler) statusPayload(r *http.Request) map[string]any {
 	recent := h.metrics.RecentLogins()
 	recentLogins := make([]map[string]any, 0, len(recent))
 	for _, rec := range recent {
+		depts := rec.Departments
+		if depts == nil {
+			depts = []store.Department{}
+		}
 		recentLogins = append(recentLogins, map[string]any{
-			"time":   rec.Time.Format("2006-01-02 15:04:05"),
-			"app":    rec.App,
-			"userid": rec.Userid,
-			"name":   rec.Name,
-			"remote": rec.Remote,
+			"time":           rec.Time.Format("2006-01-02 15:04:05"),
+			"app":            rec.App,
+			"userid":         rec.Userid,
+			"name":           rec.Name,
+			"remote":         rec.Remote,
+			"email":          rec.Email,
+			"bizMail":        rec.BizMail,
+			"jobNumber":      rec.JobNumber,
+			"alias":          rec.Alias,
+			"departments":    depts,
+			"mainDepartment": rec.MainDepartment,
 		})
 	}
 

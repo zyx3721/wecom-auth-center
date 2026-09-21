@@ -137,7 +137,7 @@ type Store interface {
 
 - `MemoryStore`（默认）：`map` + 互斥锁 + 过期惰性清理，单实例部署。
 - `RedisStore`（`store.driver: redis`）：`SET key val EX ttl` + `GETDEL` 原子取出（要求 Redis 6.2+），多实例共享；键名 `wecom-auth-center:state:*` / `wecom-auth-center:ticket:*`，值为记录 JSON；读取故障按凭证不存在处理（fail closed），启动时 Ping 快速失败。
-- 监控统计 `internal/metrics`：与审计事件同名同点位埋点，按日分桶计数保留 7 天，每 60 秒原子落盘至 `status.data_path`（启动时加载），经 `/api/status` 输出供监控页展示。
+- 监控统计 `internal/metrics`：与审计事件同名同点位埋点，按日分桶计数保留 7 天，每 60 秒原子落盘至 `status.data_path`（启动时加载），经 `/api/status` 输出供监控页展示；最近登录流水随 `fetch_profile` 附带成员档案字段，供监控页行点击弹窗展示。
 
 `access_token` 缓存随实例内存即可；引入多实例后亦无需共享（各自获取不会互相挤掉，企业微信 token 有效期内重复获取返回相同值）。
 
