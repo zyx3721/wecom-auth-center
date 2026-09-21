@@ -89,10 +89,16 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ticket, err := h.sso.NewTicket(r.Context(), store.TicketRecord{
-		App:      rec.App,
-		Redirect: rec.Redirect,
-		Userid:   ui.Userid,
-		Name:     ui.Name,
+		App:            rec.App,
+		Redirect:       rec.Redirect,
+		Userid:         ui.Userid,
+		Name:           ui.Name,
+		Email:          ui.Email,
+		BizMail:        ui.BizMail,
+		JobNumber:      ui.JobNumber,
+		Alias:          ui.Alias,
+		Departments:    ui.Departments,
+		MainDepartment: ui.MainDepartment,
 	})
 	if err != nil {
 		h.log.Error("生成 ticket 失败", slogErr(err))
@@ -108,6 +114,18 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	h.log.Info("颁发 ticket", "app", rec.App, "userid", ui.Userid)
 	h.track("ticket_issue")
 	h.audit.Event("ticket_issue", "app", rec.App, "userid", ui.Userid)
-	h.metrics.RecordLogin(metrics.LoginRecord{Time: h.now(), App: rec.App, Userid: ui.Userid, Name: ui.Name, Remote: rec.Remote})
+	h.metrics.RecordLogin(metrics.LoginRecord{
+		Time:           h.now(),
+		App:            rec.App,
+		Userid:         ui.Userid,
+		Name:           ui.Name,
+		Remote:         rec.Remote,
+		Email:          ui.Email,
+		BizMail:        ui.BizMail,
+		JobNumber:      ui.JobNumber,
+		Alias:          ui.Alias,
+		Departments:    ui.Departments,
+		MainDepartment: ui.MainDepartment,
+	})
 	http.Redirect(w, r, buildRedirectURL(app, ticket, rec.Redirect), http.StatusFound)
 }

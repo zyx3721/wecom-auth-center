@@ -76,7 +76,7 @@ func ticketViaCallback(t *testing.T, h *Handler, loginTarget string) string {
 	return rec.Header().Get("Location")
 }
 
-func postVerify(t *testing.T, h *Handler, secret, app, ticket string, ts int64, sign string) (*httptest.ResponseRecorder, map[string]string) {
+func postVerify(t *testing.T, h *Handler, secret, app, ticket string, ts int64, sign string) (*httptest.ResponseRecorder, map[string]any) {
 	t.Helper()
 	body, _ := json.Marshal(map[string]any{"app": app, "ticket": ticket, "ts": ts, "sign": sign})
 	req := httptest.NewRequest("POST", "/api/verify", strings.NewReader(string(body)))
@@ -84,9 +84,15 @@ func postVerify(t *testing.T, h *Handler, secret, app, ticket string, ts int64, 
 	rec := httptest.NewRecorder()
 	h.Verify(rec, req)
 
-	var out map[string]string
+	var out map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &out)
 	return rec, out
+}
+
+// str 取 verify 响应中的字符串字段，缺省为空串。
+func str(m map[string]any, key string) string {
+	s, _ := m[key].(string)
+	return s
 }
 
 func TestLoginRejectsUnknownApp(t *testing.T) {
@@ -191,8 +197,38 @@ func TestVerifySuccess(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("verify 应 200，实际 %d body=%s", rec.Code, rec.Body)
 	}
-	if out["userid"] != "mockuser" {
+	if str(out, "userid") != "mockuser" {
 		t.Fatalf("应返回 mockuser，实际 %v", out)
+	}
+}
+
+func TestVerifyReturnsMockProfile(t *testing.T) {
+	h := newTestHandler(t)
+	ticket := extractTicket(t, ticketViaCallback(t, h, "/login?app=oa"))
+	secret, app, ts := strings.Repeat("a", 32), "oa", time.Now().Unix()
+
+	rec, _ := postVerify(t, h, secret, app, ticket, ts, SignTicket(secret, app, ticket, ts))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("verify 应 200，实际 %d body=%s", rec.Code, rec.Body)
+	}
+	var out struct {
+		Userid         string             `json:"userid"`
+		Name           string             `json:"name"`
+		Email          string             `json:"email"`
+		BizMail        string             `json:"biz_mail"`
+		JobNumber      string             `json:"job_number"`
+		Alias          string             `json:"alias"`
+		Departments    []store.Department `json:"departments"`
+		MainDepartment int64              `json:"main_department"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("解析 verify 响应: %v", err)
+	}
+	wantDept := []store.Department{{ID: 2, Name: "研发部"}}
+	if out.Email != "mockuser@example.com" || out.BizMail != "mockuser@example.cn" ||
+		out.JobNumber != "10001" || out.Alias != "mockuser" ||
+		out.MainDepartment != 2 || len(out.Departments) != 1 || out.Departments[0] != wantDept[0] {
+		t.Fatalf("档案字段不符: %+v", out)
 	}
 }
 

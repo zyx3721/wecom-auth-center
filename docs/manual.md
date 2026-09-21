@@ -117,7 +117,7 @@ go run ./cmd/server -config config.yaml
 
 1. 302 到「模拟扫码页」→ 点击「模拟扫码成功」；
 2. `/callback` 消费 state、签发 ticket，302 跳回 `https://oa.example.com/sso/login?ticket=...`（业务系统不存在，浏览器打不开属正常，关注 URL 即可）；
-3. 按[第六章](#六http-接口与调试)的 curl 示例用 ticket 调 `/api/verify`，返回 `{"userid":"mockuser","name":"模拟用户"}`。
+3. 按[第六章](#六http-接口与调试)的 curl 示例用 ticket 调 `/api/verify`，返回 `{"userid":"mockuser","name":"模拟用户",...}`（mock 模式附带模拟档案字段）。
 
 ## 2.4 测试与常用命令
 
@@ -305,6 +305,23 @@ server {
 | `mode` | `qrcode` | `qrcode`=PC 扫码（wwlogin）；`inside`=企微内 H5 网页授权 |
 | `mock` | `false` | `true` 时不访问企微接口，`/login` 进入本地模拟扫码页，`userid` 固定为 `mockuser` |
 | `fetch_name` | `false` | `true` 时额外调通讯录 `user/get` 补全姓名（需应用有通讯录读取权限）；取不到不阻断登录 |
+| `fetch_profile` | `false` | `true` 时额外获取成员档案：部门（含名称换算）、邮箱/企业邮箱、员工编码、别名（含姓名），随 `/api/verify` 返回；需应用有通讯录读取权限，取不到不阻断登录 |
+| `contact_secret` | 空（可选） | 通讯录 Secret（企微后台「管理工具 → 通讯录同步」查看）。2022-06-20 后创建的自建应用 `user/get` 不再返回邮箱等敏感字段，需配置本项才能取到；配置后须在企微后台为通讯录同步配置服务器 IP 白名单 |
+| `job_number_extattr` | `员工编码` | 员工编码取自成员扩展属性的字段名（企微后台通讯录成员详情中的自定义字段，需企业自行维护）；扩展属性中找不到同名字段时 `job_number` 返回空串，不报错、不阻断登录 |
+
+**`fetch_name` / `fetch_profile` / `contact_secret` 三者关系**：`fetch_name` 与 `fetch_profile` 是「取什么」的开关，`contact_secret` 是「用什么权限去取」的凭据，本身不触发任何请求。组合行为对照：
+
+| 配置组合 | 实际行为 |
+| --- | --- |
+| 只开 `fetch_name` | 只解析姓名（兼容旧配置，适合只要姓名的场景） |
+| 只开 `fetch_profile` | 档案全套解析（含姓名），部门/员工编码/别名可取；2022-06-20 后创建的自建应用**邮箱、企业邮箱为空** |
+| `fetch_profile` + `contact_secret` | 档案全量可取（邮箱/企业邮箱经通讯录 Secret 返回）✅ |
+| 仅配置 `contact_secret` | 无任何效果（它依附于 `fetch_profile`，不开启时是死配置） |
+| 两者均不开启 | 不调通讯录接口，verify 仅返回 `userid` |
+
+- 两者都开启时 `fetch_profile` 优先：姓名包含在档案同一次调用里，`fetch_name` 无需重复开启；
+- 档案字段（含姓名）取不到时一律**静默降级为空值，不阻断登录**；
+- 企业邮箱（`biz_mail`）与成员邮箱（`email`）是两个不同字段，均需 `contact_secret` 才能取到。
 
 ## 5.3 ttl
 
@@ -371,7 +388,7 @@ state/ticket 以 JSON 存于 `wecom-auth-center:state:*` 与 `wecom-auth-center:
 | --- | --- | --- | --- |
 | GET | `/login?app=oa&redirect=/path` | 业务系统 302 用户 | 白名单校验 → 登记 state → 302 企微授权页（mock 模式 302 模拟扫码页） |
 | GET | `/callback?code=&state=` | 企业微信 | 消费 state → code 换 userid → 签发 ticket → 302 回 `app.callback_path` |
-| POST | `/api/verify` | 业务系统后端 | 签名/时间偏差校验 → ticket 一次性消费 → `{userid, name}` |
+| POST | `/api/verify` | 业务系统后端 | 签名/时间偏差校验 → ticket 一次性消费 → `{userid, name, email, biz_mail, job_number, alias, departments, main_department}` |
 | GET | `/status?token=` | 管理员浏览器 | 监控页（`status.enabled` 开启后可用） |
 | GET | `/api/status?token=` | 监控页 | 统计、运行信息与存储健康（Token 保护） |
 | GET | `/healthz` | 探活 | `ok` |
@@ -404,10 +421,20 @@ SIGN=$(printf '%s\n%s\n%s' "$APP" "$TICKET" "$TS" | openssl dgst -sha256 -hmac "
 curl -s -X POST https://auth.example.com/api/verify \
   -H "Content-Type: application/json" \
   -d "{\"app\":\"$APP\",\"ticket\":\"$TICKET\",\"ts\":$TS,\"sign\":\"$SIGN\"}"
-# {"name":"...","userid":"zhangsan"}
+# {"userid":"zhangsan","name":"张三","email":"","biz_mail":"zhangsan@company.cn","job_number":"10001","alias":"zhangsan","departments":[{"id":2,"name":"研发部"}],"main_department":2}
 
 # 同一 ticket 再发一次 → {"error":"invalid_ticket"}（一次性生效）
 ```
+
+verify 成功响应字段说明：
+
+| 字段 | 说明 |
+| --- | --- |
+| `userid` / `name` | 企微成员账号与姓名；`name` 需开启 `fetch_name` 或 `fetch_profile` |
+| `email` / `biz_mail` | 成员邮箱 / 企业邮箱；需开启 `fetch_profile` 且配置 `contact_secret`（2022-06-20 后创建的自建应用） |
+| `job_number` | 员工编码，取自扩展属性 `job_number_extattr` 指定字段（默认「员工编码」），需开启 `fetch_profile`；字段名不匹配或企业未维护该扩展属性时为空串 |
+| `alias` | 企微后台成员「账号」字段，需开启 `fetch_profile` |
+| `departments` / `main_department` | 所属部门（ID + 名称）与主部门 ID；部门名称仅对应用可见范围内的部门可换算 |
 
 # 七、业务系统接入联调
 

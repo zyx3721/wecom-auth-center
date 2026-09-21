@@ -75,7 +75,18 @@ func main() {
 		logger.Warn("启用 mock 模式：不访问企业微信真实接口，仅用于本地演练")
 		wcom = service.MockClient{}
 	} else {
-		wcom = service.NewRealClient(cfg.Wecom.CorpID, cfg.Wecom.AgentID, cfg.Wecom.Secret, cfg.Wecom.FetchName)
+		if cfg.Wecom.FetchProfile && cfg.Wecom.ContactSecret == "" {
+			logger.Warn("已开启 fetch_profile 但未配置 contact_secret，邮箱等敏感字段可能获取不到（2022-06-20 后创建的自建应用受限）")
+		}
+		wcom = service.NewRealClient(service.ClientOptions{
+			CorpID:         cfg.Wecom.CorpID,
+			AgentID:        cfg.Wecom.AgentID,
+			Secret:         cfg.Wecom.Secret,
+			ContactSecret:  cfg.Wecom.ContactSecret,
+			FetchName:      cfg.Wecom.FetchName,
+			FetchProfile:   cfg.Wecom.FetchProfile,
+			JobNumberField: cfg.Wecom.JobNumberExtattr,
+		})
 	}
 
 	st := buildStore(cfg, logger)

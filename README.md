@@ -113,7 +113,7 @@ go run ./cmd/server -config config.yaml
 
 浏览器打开 `http://127.0.0.1:8700/login?app=oa`，进入模拟扫码页点击「模拟扫码成功」，
 即可看到 302 跳回 `https://oa.example.com/sso/login?ticket=...` 的完整链路；
-用 `docs/client-integration.md` 中的签名算法对 ticket 调 `POST /api/verify` 可换取 `{"userid":"mockuser"}`。
+用 `docs/client-integration.md` 中的签名算法对 ticket 调 `POST /api/verify` 可换取 `{"userid":"mockuser","name":"模拟用户",...}`。
 
 跑测试：
 
@@ -255,7 +255,7 @@ systemctl daemon-reload && systemctl enable --now wecom-auth-center
 | --- | --- | --- | --- |
 | GET | `/login?app=oa&redirect=/path` | 业务系统跳转用户 | 校验白名单 → 登记 state → 302 企微扫码页 |
 | GET | `/callback?code=&state=` | 企业微信 | 消费 state → code 换 userid → 发 ticket → 302 回业务系统 |
-| POST | `/api/verify` | 业务系统后端 | 签名校验 → ticket 一次性消费 → 返回 `{userid, name}` |
+| POST | `/api/verify` | 业务系统后端 | 签名校验 → ticket 一次性消费 → 返回 `{userid, name}` 与档案字段（开启 `fetch_profile` 后含邮箱/企业邮箱、部门、员工编码等） |
 | GET | `/status?token=` | 管理员浏览器 | 监控页（`status.enabled` 开启后可用） |
 | GET | `/api/status?token=` | 监控页 | 登录/兑换统计、运行信息与存储健康（Token 保护） |
 | GET | `/healthz` | 探活 | 返回 `ok` |

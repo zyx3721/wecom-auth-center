@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jerion/wecom-auth-center/server/internal/middleware"
+	"github.com/jerion/wecom-auth-center/server/internal/store"
 )
 
 // verifyRequest 业务系统后端调用 /api/verify 的请求体。
@@ -20,6 +21,18 @@ type verifyRequest struct {
 	Ticket string `json:"ticket"`
 	TS     int64  `json:"ts"`   // Unix 秒
 	Sign   string `json:"sign"` // hex(HMAC-SHA256(key=app_secret, msg=app+"\n"+ticket+"\n"+ts))
+}
+
+// verifyResponse /api/verify 成功响应；档案字段在未开启对应开关时为零值。
+type verifyResponse struct {
+	Userid         string             `json:"userid"`
+	Name           string             `json:"name"`
+	Email          string             `json:"email"`
+	BizMail        string             `json:"biz_mail"`
+	JobNumber      string             `json:"job_number"`
+	Alias          string             `json:"alias"`
+	Departments    []store.Department `json:"departments"`
+	MainDepartment int64              `json:"main_department"`
 }
 
 // Verify POST /api/verify
@@ -77,9 +90,19 @@ func (h *Handler) Verify(w http.ResponseWriter, r *http.Request) {
 
 	h.track("verify_ok")
 	h.audit.Event("verify_ok", "app", req.App, "userid", rec.Userid, "remote", remote)
-	writeJSON(w, http.StatusOK, map[string]string{
-		"userid": rec.Userid,
-		"name":   rec.Name,
+	depts := rec.Departments
+	if depts == nil {
+		depts = []store.Department{}
+	}
+	writeJSON(w, http.StatusOK, verifyResponse{
+		Userid:         rec.Userid,
+		Name:           rec.Name,
+		Email:          rec.Email,
+		BizMail:        rec.BizMail,
+		JobNumber:      rec.JobNumber,
+		Alias:          rec.Alias,
+		Departments:    depts,
+		MainDepartment: rec.MainDepartment,
 	})
 }
 

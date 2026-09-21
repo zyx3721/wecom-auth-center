@@ -35,12 +35,15 @@ type Config struct {
 	} `yaml:"server"`
 
 	Wecom struct {
-		CorpID    string `yaml:"corpid"`
-		AgentID   int    `yaml:"agentid"`
-		Secret    string `yaml:"secret"`
-		Mode      Mode   `yaml:"mode"`
-		Mock      bool   `yaml:"mock"`       // true 时用假企业微信实现，本地演练全流程
-		FetchName bool   `yaml:"fetch_name"` // true 时额外调用通讯录接口取姓名
+		CorpID           string `yaml:"corpid"`
+		AgentID          int    `yaml:"agentid"`
+		Secret           string `yaml:"secret"`
+		Mode             Mode   `yaml:"mode"`
+		Mock             bool   `yaml:"mock"`               // true 时用假企业微信实现，本地演练全流程
+		FetchName        bool   `yaml:"fetch_name"`         // true 时额外调用通讯录接口取姓名
+		FetchProfile     bool   `yaml:"fetch_profile"`      // true 时额外获取成员档案：部门/邮箱/员工编码等（含姓名）
+		ContactSecret    string `yaml:"contact_secret"`     // 通讯录 Secret（可选）：配置后档案接口可返回邮箱等敏感字段
+		JobNumberExtattr string `yaml:"job_number_extattr"` // 员工编码取自扩展属性的字段名，默认「员工编码」
 	} `yaml:"wecom"`
 
 	TTL struct {
@@ -103,6 +106,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Wecom.Mode == "" {
 		c.Wecom.Mode = ModeQrcode
+	}
+	if c.Wecom.JobNumberExtattr == "" {
+		c.Wecom.JobNumberExtattr = "员工编码"
 	}
 	if c.TTL.State == 0 {
 		c.TTL.State = 5 * time.Minute

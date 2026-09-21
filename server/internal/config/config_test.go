@@ -52,6 +52,9 @@ func TestLoadValid(t *testing.T) {
 	if cfg.Status.DataPath != "status-metrics.json" {
 		t.Fatalf("监控统计默认路径应为 status-metrics.json，实际 %s", cfg.Status.DataPath)
 	}
+	if cfg.Wecom.JobNumberExtattr != "员工编码" {
+		t.Fatalf("员工编码扩展属性字段默认值应为「员工编码」，实际 %s", cfg.Wecom.JobNumberExtattr)
+	}
 }
 
 func TestLoadRejects(t *testing.T) {

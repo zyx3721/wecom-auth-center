@@ -27,7 +27,9 @@ func ssoLogin(w http.ResponseWriter, r *http.Request) {
     resp, err := http.Post("https://auth.example.com/api/verify", "application/json",
         strings.NewReader(fmt.Sprintf(`{"app":"itdb","ticket":%q,"ts":%d,"sign":%q}`,
             ticket, ts, sign)))
-    // err 处理、解码 {"userid":..., "name":...}
+    // err 处理、解码 {"userid":..., "name":..., "email":..., "biz_mail":..., "job_number":...,
+    //                   "alias":..., "departments":[{"id":..,"name":..}], "main_department":..}
+    // 档案字段（email/job_number/departments 等）需认证中心开启 fetch_profile 才有值，未开启时为零值
     // verify 失败（401/非 200）→ 跳转认证中心 /login 重新走流程
 
     userid := parse(resp)

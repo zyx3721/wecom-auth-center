@@ -25,7 +25,7 @@ sequenceDiagram
     Auth->>U: 302 → https://oa.example.com/sso/login?ticket=xxx
     U->>A: GET /sso/login?ticket=xxx
     A->>Auth: POST /api/verify（ticket + app + 时间戳 + HMAC 签名）
-    Auth-->>A: {"userid":"zhangsan","name":"张三"}（ticket 同时作废）
+    Auth-->>A: {"userid":"zhangsan","name":"张三",...档案字段}（ticket 同时作废）
     A->>A: 匹配本地账号，建立自己的 Session/JWT
     A->>U: 登录成功，进入系统
 ```
@@ -67,8 +67,9 @@ https://login.work.weixin.qq.com/wwlogin/sso/login
 1. 原子消费 `state`：不存在或已过期 → 403 页面（防重放：取到即删）。
 2. 用 `code` 换取身份：
    - `GET https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=&corpsecret=` → `access_token`（缓存 7200s，提前 5 分钟刷新，加锁防并发击穿）；
-   - `GET https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token=&code=` → `userid`。
-3. 生成一次性 `ticket`，保存 `ticket → {app, redirect, userid}`，TTL 60s。
+   - `GET https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo?access_token=&code=` → `userid`；
+   - 开启 `fetch_name` / `fetch_profile` 时额外调用通讯录 `user/get` 补全姓名或档案（部门/邮箱/员工编码/别名）。`fetch_profile` 优先使用通讯录 Secret 的独立 token（可返回邮箱等敏感字段），部门 ID 经 `department/get` 换算名称（进程内缓存 10 分钟）；档案取不到时静默降级，不阻断登录。
+3. 生成一次性 `ticket`，保存 `ticket → {app, redirect, userid, 可选档案字段}`，TTL 60s。
 4. 302 到白名单中该 app 的回调地址：`https://oa.example.com/sso/login?ticket=xxx&redirect=/dashboard`。
 
 任何失败（state 无效、企业微信接口报错）都跳转到统一错误提示页，不重定向回业务系统。
@@ -99,8 +100,19 @@ sign = hex( HMAC-SHA256( key = app_secret, message = app + "\n" + ticket + "\n" 
 通过后**立即删除 ticket**，返回：
 
 ```json
-{ "userid": "zhangsan", "name": "张三" }
+{
+  "userid": "zhangsan",
+  "name": "张三",
+  "email": "",
+  "biz_mail": "zhangsan@company.cn",
+  "job_number": "10001",
+  "alias": "zhangsan",
+  "departments": [{ "id": 2, "name": "研发部" }],
+  "main_department": 2
+}
 ```
+
+档案字段在未开启 `fetch_profile` 时为零值（`departments` 为空数组），响应形状恒定，业务系统可统一解析。
 
 每个业务系统在认证中心配置文件中登记 `app` 标识、回调域名和独立的 `app_secret`（仅用于 verify 签名，与企业微信 secret 无关）。
 
