@@ -1,6 +1,6 @@
 package handler
 
-// statusHTML 监控页单文件前端：全视口 KMS 风格仪表盘，自绘 SVG 平滑曲线 + 悬停提示 + 统计卡弹窗明细 +
+// statusHTML 监控页单文件前端：全视口仪表盘，自绘 SVG 平滑曲线 + 悬停提示 + 统计卡弹窗明细 +
 // 最近登录行点击弹窗查看成员信息，30 秒自动刷新。样式与脚本分别在 status_page_style.go 与 status_page_script.go。
 const statusHTML = statusPageHead + statusPageCSS + statusPageMid + statusPageJS + statusPageTail
 

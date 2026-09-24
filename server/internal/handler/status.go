@@ -16,7 +16,7 @@ import (
 // rejectEvents 监控页展示的拒绝类安全事件
 var rejectEvents = []string{"state_reject", "verify_app_reject", "verify_sign_reject", "verify_ts_reject", "ticket_reject", "ticket_mismatch"}
 
-// Status GET /status?token=xxx — KMS 风格监控页。
+// Status GET /status?token=xxx — 监控页
 func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	if !h.statusEnabled(w, r) {
 		return

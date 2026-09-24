@@ -1,6 +1,6 @@
 package handler
 
-// statusPageCSS 监控页全部样式：KMS 风格仪表盘、曲线图、统计卡弹窗与最近登录档案弹窗
+// statusPageCSS 监控页全部样式：仪表盘、曲线图、统计卡弹窗与最近登录档案弹窗
 const statusPageCSS = `  :root{
     --card:rgba(255,255,255,.82);
     --border:rgba(255,255,255,.75);
