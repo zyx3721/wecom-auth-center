@@ -1,5 +1,5 @@
 # 敏感配置（corpid/secret/app_secret）
-server/config.yaml
+server/config.yaml*
 *.local.yaml
 
 # Go
