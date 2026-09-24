@@ -65,7 +65,7 @@ wecom-auth-center/
 │   ├── internal/store/         短时效存储接口与内存/Redis 实现
 │   ├── internal/audit/         安全审计事件独立落盘
 │   ├── internal/middleware/    日志、恢复、限流
-│   ├── web/static/             企微域名校验文件等静态资源
+│   ├── web/static/             企微域名校验文件与监控页图标等静态资源
 │   └── config.example.yaml     配置模板
 ├── deploy/                     Dockerfile、compose 示例、nginx 示例、systemd 单元
 ├── scripts/                    服务器启停管理脚本（start/stop/restart）
@@ -136,7 +136,7 @@ gofmt -l .             # 无输出即格式合规
 ```text
 /opt/wecom-auth-center/
 ├── config.yaml      # 从 server/config.example.yaml 复制修改，权限 600
-└── web/static/      # 可选：WW_verify 域名校验文件（镜像已内置静态目录，也可挂载覆盖）
+└── web/static/      # 可选：WW_verify 域名校验文件与监控页图标（镜像已内置静态目录，也可挂载覆盖）
 ```
 
 ## 3.2 准备配置文件
@@ -292,7 +292,7 @@ server {
 | --- | --- | --- |
 | `listen` | `:8700` | HTTP 监听地址；容器内保持默认，反代场景建议 `127.0.0.1:8700` |
 | `external_url` | 无（必填） | 对外访问地址，用于拼接 `redirect_uri`；不能以 `/` 结尾 |
-| `static_dir` | `web/static` | 静态目录（域名校验文件），相对工作目录 |
+| `static_dir` | `web/static` | 静态目录（域名校验文件、监控页图标），相对工作目录 |
 | `trust_proxy` | `false` | 反代后设 `true`，从 `X-Real-IP` 取客户端 IP |
 
 ## 5.2 wecom

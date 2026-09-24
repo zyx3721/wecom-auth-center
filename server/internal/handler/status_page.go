@@ -11,7 +11,7 @@ const statusPageHead = `<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#4f46e5">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ctext x='16' y='22' font-size='15' font-weight='bold' text-anchor='middle' fill='white'%3EW%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <title>企微统一认证 · 运行状态与监控</title>
 <style>
 `
@@ -25,7 +25,7 @@ const statusPageMid = `
 
   <header class="topbar">
     <div class="brand">
-      <div class="logo">W</div>
+      <img class="logo" src="/logo.svg" alt="企微统一认证">
       <div class="brand-text">
         <h1>企微统一认证 · 运行状态与监控</h1>
         <p>WECOM AUTH CENTER STATUS &amp; MONITORING</p>

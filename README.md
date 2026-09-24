@@ -338,7 +338,7 @@ wecom-auth-center/
 │   │   ├── service/            wecom.go（token 缓存/换取身份/mock）、sso.go（state/ticket）
 │   │   ├── store/              短时效存储接口与内存/Redis 实现
 │   │   └── middleware/         请求日志、panic 恢复、IP 限流
-│   ├── web/static/             企业微信域名校验文件等静态资源
+│   ├── web/static/             企业微信域名校验文件与监控页图标等静态资源
 │   ├── config.example.yaml     配置模板（config.yaml 已被 git 排除）
 │   └── go.mod
 ├── deploy/

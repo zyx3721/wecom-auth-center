@@ -332,7 +332,7 @@ wecom-auth-center/
 │   │   ├── service/            wecom.go (token cache/identity/mock), sso.go (state/ticket)
 │   │   ├── store/              short-lived store interface + memory/Redis implementations
 │   │   └── middleware/         request log, panic recovery, IP rate limiting
-│   ├── web/static/             WeCom domain verification file & static assets
+│   ├── web/static/             WeCom domain verification file, status page icons & static assets
 │   ├── config.example.yaml     config template (config.yaml is git-ignored)
 │   └── go.mod
 ├── deploy/

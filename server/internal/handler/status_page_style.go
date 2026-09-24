@@ -34,8 +34,7 @@ const statusPageCSS = `  :root{
 
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:14px;min-width:0}
-  .logo{width:46px;height:46px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--indigo),var(--violet));color:#fff;font-weight:800;font-size:21px;
+  .logo{width:46px;height:46px;border-radius:14px;flex:none;
     box-shadow:0 10px 24px rgba(79,70,229,.35)}
   .brand-text h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.4px;white-space:nowrap}
   .brand-text p{margin:2px 0 0;font-size:12px;color:var(--muted2);letter-spacing:.4px}

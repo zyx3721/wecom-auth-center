@@ -116,6 +116,7 @@ sign = hex( HMAC-SHA256( key = app_secret, message = app + "\n" + ticket + "\n" 
 
 - `GET /healthz` — 健康检查。
 - `GET /WW_verify_xxxxxxxx.txt` — 企业微信域名归属校验文件，从 `web/static/` 直接服务。
+- `GET /favicon.svg`、`GET /logo.svg` — 监控页站点图标与品牌图标，同随 `web/static/` 静态目录直接服务，无 Token 保护（不含敏感信息）。
 - `GET /error` — 统一错误提示页。
 
 ## 数据设计
