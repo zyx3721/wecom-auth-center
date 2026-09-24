@@ -377,6 +377,7 @@ wecom-auth-center/
 
 | 版本 | 发布日期 | 更新日志 |
 | --- | --- | --- |
+| v1.2.3 | 2026-09-24 | [verchanglog/v1.2.3.md](verchanglog/v1.2.3.md) |
 | v1.2.2 | 2026-09-20 | [verchanglog/v1.2.2.md](verchanglog/v1.2.2.md) |
 | v1.2.1 | 2026-09-19 | [verchanglog/v1.2.1.md](verchanglog/v1.2.1.md) |
 | v1.2.0 | 2026-09-19 | [verchanglog/v1.2.0.md](verchanglog/v1.2.0.md) |
